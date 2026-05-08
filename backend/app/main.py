@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
 from .db import Base, engine, get_db
-from .models import Battery, BuildVersion, Drone, FileRole, FlightNote, InstalledComponent, MaintenanceEvent, Manufacturer, Product, ProductCategory, ProductVariant, Snapshot, StoredFile
+from .models import Battery, BuildVersion, Drone, FileRole, FlightNote, InstalledComponent, MaintenanceEvent, Manufacturer, PreflightChecklistItem, Product, ProductCategory, ProductVariant, Snapshot, StoredFile
 from .parser import parse_betaflight_config
 
 _BF_VERSION_RE = re.compile(r"Betaflight\s*/\s*(?:INAV\s*/\s*)?[^/]+\s+([0-9]+\.[0-9]+\.[0-9]+)", re.IGNORECASE)
@@ -32,6 +32,8 @@ from .schemas import (
     FlightNoteOut,
     FlightNoteUpdate,
     MaintenanceEventUpdate,
+    PreflightItemCreate,
+    PreflightItemOut,
     ProductUpdate,
     InstalledComponentCreate,
     InstalledComponentOut,
@@ -93,9 +95,23 @@ def _run_migrations() -> None:
         ("category", "VARCHAR(80)"),
         ("current_build_version_id", "INTEGER"),
     ]
+    new_flight_note_columns = [
+        ("battery_id", "INTEGER REFERENCES batteries(id) ON DELETE SET NULL"),
+        ("duration_minutes", "INTEGER"),
+        ("battery_used_percent", "INTEGER"),
+    ]
+    new_maintenance_columns = [
+        ("event_type", "VARCHAR(32) DEFAULT 'general'"),
+        ("damage_items", "TEXT"),
+        ("repair_cost_pln", "INTEGER"),
+    ]
     with engine.connect() as conn:
         for col, typedef in new_drone_columns:
             conn.execute(text(f"ALTER TABLE drones ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+        for col, typedef in new_flight_note_columns:
+            conn.execute(text(f"ALTER TABLE flight_notes ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+        for col, typedef in new_maintenance_columns:
+            conn.execute(text(f"ALTER TABLE maintenance_events ADD COLUMN IF NOT EXISTS {col} {typedef}"))
         conn.commit()
 
 
@@ -587,8 +603,20 @@ def compare_snapshots(payload: CompareRequest, db: Session = Depends(get_db)) ->
 @app.post("/api/drones/{drone_id}/flights", response_model=FlightNoteOut, status_code=201)
 def create_flight_note(drone_id: int, payload: FlightNoteCreate, db: Session = Depends(get_db)) -> FlightNote:
     drone = get_drone_or_404(db, drone_id)
-    note = FlightNote(drone_id=drone.id, title=payload.title, note=payload.note)
+    note = FlightNote(
+        drone_id=drone.id,
+        title=payload.title,
+        note=payload.note,
+        battery_id=payload.battery_id,
+        duration_minutes=payload.duration_minutes,
+        battery_used_percent=payload.battery_used_percent,
+    )
     db.add(note)
+    # Increment battery cycle count if battery linked
+    if payload.battery_id:
+        battery = db.execute(select(Battery).where(Battery.id == payload.battery_id)).scalar_one_or_none()
+        if battery:
+            battery.cycle_count = battery.cycle_count + 1
     db.commit()
     db.refresh(note)
     return note
@@ -603,6 +631,12 @@ def update_flight_note(drone_id: int, note_id: int, payload: FlightNoteUpdate, d
         note.title = payload.title
     if payload.note is not None:
         note.note = payload.note
+    if payload.battery_id is not None:
+        note.battery_id = payload.battery_id
+    if payload.duration_minutes is not None:
+        note.duration_minutes = payload.duration_minutes
+    if payload.battery_used_percent is not None:
+        note.battery_used_percent = payload.battery_used_percent
     db.commit()
     db.refresh(note)
     return note
@@ -626,8 +660,18 @@ def list_flight_notes(drone_id: int, db: Session = Depends(get_db)) -> list[Flig
 @app.post("/api/drones/{drone_id}/maintenance", response_model=MaintenanceEventOut, status_code=201)
 def create_maintenance_event(drone_id: int, payload: MaintenanceEventCreate, db: Session = Depends(get_db)) -> MaintenanceEvent:
     drone = get_drone_or_404(db, drone_id)
-    event = MaintenanceEvent(drone_id=drone.id, title=payload.title, note=payload.note)
+    event = MaintenanceEvent(
+        drone_id=drone.id,
+        title=payload.title,
+        note=payload.note,
+        event_type=payload.event_type,
+        damage_items=payload.damage_items,
+        repair_cost_pln=payload.repair_cost_pln,
+    )
     db.add(event)
+    # Auto-ground drone on crash report
+    if payload.event_type == "crash" and drone.status == "flyable":
+        drone.status = "grounded_crash"
     db.commit()
     db.refresh(event)
     return event
@@ -642,6 +686,12 @@ def update_maintenance_event(drone_id: int, event_id: int, payload: MaintenanceE
         event.title = payload.title
     if payload.note is not None:
         event.note = payload.note
+    if payload.event_type is not None:
+        event.event_type = payload.event_type
+    if payload.damage_items is not None:
+        event.damage_items = payload.damage_items
+    if payload.repair_cost_pln is not None:
+        event.repair_cost_pln = payload.repair_cost_pln
     db.commit()
     db.refresh(event)
     return event
@@ -664,6 +714,46 @@ def list_maintenance_events(drone_id: int, db: Session = Depends(get_db)) -> lis
             select(MaintenanceEvent).where(MaintenanceEvent.drone_id == drone_id).order_by(MaintenanceEvent.created_at.desc())
         ).scalars()
     )
+
+
+# ── Preflight checklist endpoints ─────────────────────────────────────────────
+
+@app.get("/api/drones/{drone_id}/checklist", response_model=list[PreflightItemOut])
+def list_checklist(drone_id: int, db: Session = Depends(get_db)) -> list[PreflightChecklistItem]:
+    get_drone_or_404(db, drone_id)
+    return list(
+        db.execute(
+            select(PreflightChecklistItem)
+            .where(PreflightChecklistItem.drone_id == drone_id)
+            .order_by(PreflightChecklistItem.order_idx, PreflightChecklistItem.id)
+        ).scalars()
+    )
+
+
+@app.post("/api/drones/{drone_id}/checklist", response_model=PreflightItemOut, status_code=201)
+def create_checklist_item(drone_id: int, payload: PreflightItemCreate, db: Session = Depends(get_db)) -> PreflightChecklistItem:
+    get_drone_or_404(db, drone_id)
+    item = PreflightChecklistItem(
+        drone_id=drone_id,
+        label=payload.label,
+        order_idx=payload.order_idx,
+        is_required=payload.is_required,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.delete("/api/drones/{drone_id}/checklist/{item_id}", status_code=204)
+def delete_checklist_item(drone_id: int, item_id: int, db: Session = Depends(get_db)) -> None:
+    item = db.execute(
+        select(PreflightChecklistItem).where(PreflightChecklistItem.id == item_id, PreflightChecklistItem.drone_id == drone_id)
+    ).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Checklist item not found")
+    db.delete(item)
+    db.commit()
 
 
 # ── Battery fleet endpoints ────────────────────────────────────────────────────

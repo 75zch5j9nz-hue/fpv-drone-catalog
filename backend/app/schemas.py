@@ -246,21 +246,49 @@ class ReplaceComponentRequest(BaseModel):
 class FlightNoteCreate(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     note: str = Field(min_length=1)
+    battery_id: int | None = None
+    duration_minutes: int | None = Field(default=None, ge=1, le=600)
+    battery_used_percent: int | None = Field(default=None, ge=1, le=100)
 
 
 class FlightNoteUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=160)
     note: str | None = Field(default=None, min_length=1)
+    battery_id: int | None = None
+    duration_minutes: int | None = Field(default=None, ge=1, le=600)
+    battery_used_percent: int | None = Field(default=None, ge=1, le=100)
 
 
 class MaintenanceEventCreate(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     note: str = Field(min_length=1)
+    event_type: str = "general"  # general | motor_swap | prop_change | frame_repair | fc_flash | crash
+    damage_items: str | None = None   # JSON string: list of damaged part labels
+    repair_cost_pln: int | None = Field(default=None, ge=0)
 
 
 class MaintenanceEventUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=160)
     note: str | None = Field(default=None, min_length=1)
+    event_type: str | None = None
+    damage_items: str | None = None
+    repair_cost_pln: int | None = Field(default=None, ge=0)
+
+
+class PreflightItemCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=160)
+    order_idx: int = 0
+    is_required: bool = True
+
+
+class PreflightItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    drone_id: int
+    label: str
+    order_idx: int
+    is_required: bool
+    created_at: datetime
 
 
 class ProductUpdate(BaseModel):
@@ -355,6 +383,9 @@ class FlightNoteOut(BaseModel):
     id: int
     title: str
     note: str
+    battery_id: int | None
+    duration_minutes: int | None
+    battery_used_percent: int | None
     created_at: datetime
 
 
@@ -364,6 +395,9 @@ class MaintenanceEventOut(BaseModel):
     id: int
     title: str
     note: str
+    event_type: str
+    damage_items: str | None
+    repair_cost_pln: int | None
     created_at: datetime
 
 

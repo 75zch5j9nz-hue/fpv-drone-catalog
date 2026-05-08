@@ -221,9 +221,14 @@ class FlightNote(Base):
     drone_id: Mapped[int] = mapped_column(ForeignKey("drones.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(160))
     note: Mapped[str] = mapped_column(Text)
+    # Battery linkage + session metadata
+    battery_id: Mapped[int | None] = mapped_column(ForeignKey("batteries.id", ondelete="SET NULL"), nullable=True, index=True)
+    duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    battery_used_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     drone: Mapped[Drone] = relationship(back_populates="flight_notes")
+    battery: Mapped["Battery | None"] = relationship()
 
 
 class MaintenanceEvent(Base):
@@ -233,9 +238,26 @@ class MaintenanceEvent(Base):
     drone_id: Mapped[int] = mapped_column(ForeignKey("drones.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(160))
     note: Mapped[str] = mapped_column(Text)
+    # Event classification + crash report fields
+    event_type: Mapped[str] = mapped_column(String(32), default="general")
+    damage_items: Mapped[str | None] = mapped_column(Text, nullable=True)   # JSON list of damaged parts
+    repair_cost_pln: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     drone: Mapped[Drone] = relationship(back_populates="maintenance_events")
+
+
+class PreflightChecklistItem(Base):
+    __tablename__ = "preflight_checklist_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    drone_id: Mapped[int] = mapped_column(ForeignKey("drones.id", ondelete="CASCADE"), index=True)
+    label: Mapped[str] = mapped_column(String(160))
+    order_idx: Mapped[int] = mapped_column(Integer, default=0)
+    is_required: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    drone: Mapped[Drone] = relationship()
 
 
 class BuildVersion(Base):

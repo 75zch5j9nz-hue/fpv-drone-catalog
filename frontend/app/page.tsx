@@ -38,6 +38,23 @@ type Note = {
   title: string;
   note: string;
   created_at: string;
+  // Flight note optional fields
+  battery_id?: number | null;
+  duration_minutes?: number | null;
+  battery_used_percent?: number | null;
+  // Maintenance event optional fields
+  event_type?: string;
+  damage_items?: string | null;
+  repair_cost_pln?: number | null;
+};
+
+type PreflightItem = {
+  id: number;
+  drone_id: number;
+  label: string;
+  order_idx: number;
+  is_required: boolean;
+  created_at: string;
 };
 
 type Drone = {
@@ -377,7 +394,12 @@ export default function HomePage() {
   // Hardware history panel for a selected drone
   const [showHwHistory, setShowHwHistory] = useState<number | null>(null); // drone id
   const [hwHistory, setHwHistory] = useState<InstalledComponent[]>([]);
-  const [droneTab, setDroneTab] = useState<'snapshots' | 'flight-log' | 'maintenance' | 'compare'>('snapshots');
+  const [droneTab, setDroneTab] = useState<'snapshots' | 'flight-log' | 'maintenance' | 'compare' | 'checklist'>('snapshots');
+  // Checklist state
+  const [checklistItems, setChecklistItems] = useState<Record<number, PreflightItem[]>>({});
+  const [checklistChecked, setChecklistChecked] = useState<Record<string, boolean>>({});
+  // Maintenance form type
+  const [newMaintEventType, setNewMaintEventType] = useState('general');
 
   function setOk(msg: string) { setStatusIsError(false); setStatus(msg); }
   function setErr(msg: string) { setStatusIsError(true); setStatus(msg); }
@@ -428,6 +450,15 @@ export default function HomePage() {
   useEffect(() => {
     apiFetch<AppStats>('/api/stats').then(setAppStats).catch(() => {});
   }, [drones, batteries]);
+
+  async function loadChecklist(droneId: number) {
+    try {
+      const items = await apiFetch<PreflightItem[]>(`/api/drones/${droneId}/checklist`);
+      setChecklistItems(prev => ({ ...prev, [droneId]: items }));
+    } catch (_e) {
+      // checklist may be empty for new drones
+    }
+  }
 
   async function loadCatalogue(): Promise<CatalogueProduct[]> {
     if (catLoaded) return catalogue;
@@ -670,16 +701,33 @@ export default function HomePage() {
     }
     const form = event.currentTarget;
     const formData = new FormData(form);
+    const payload: Record<string, unknown> = {
+      title: formData.get('title'),
+      note: formData.get('note'),
+    };
+    if (type === 'flights') {
+      const battId = formData.get('battery_id');
+      const dur = formData.get('duration_minutes');
+      const pct = formData.get('battery_used_percent');
+      if (battId) payload.battery_id = Number(battId);
+      if (dur) payload.duration_minutes = Number(dur);
+      if (pct) payload.battery_used_percent = Number(pct);
+    } else {
+      const evType = formData.get('event_type') as string || 'general';
+      payload.event_type = evType;
+      const damageItems = formData.get('damage_items');
+      if (damageItems) payload.damage_items = damageItems;
+      const cost = formData.get('repair_cost_pln');
+      if (cost) payload.repair_cost_pln = Number(cost);
+    }
     await submitJson(
       `/api/drones/${selectedDrone.id}/${type}`,
-      {
-        title: formData.get('title'),
-        note: formData.get('note'),
-      },
+      payload,
       type === 'flights' ? 'Flight note added.' : 'Maintenance event added.',
       selectedDrone.id,
     );
     form.reset();
+    setNewMaintEventType('general');
   }
 
   async function markSnapshot(snapshotId: number, mode: 'current' | 'known-good') {
@@ -1758,13 +1806,17 @@ export default function HomePage() {
                 ['snapshots', `Snapshots (${selectedDrone.snapshots.length})`],
                 ['flight-log', `Flight Log (${selectedDrone.flight_notes.length})`],
                 ['maintenance', `Maintenance (${selectedDrone.maintenance_events.length})`],
+                ['checklist', `Checklist (${(checklistItems[selectedDrone.id] ?? []).length})`],
                 ['compare', 'Compare'],
               ] as const).map(([tab, label]) => (
                 <button
                   key={tab}
                   className={`dw-tab${droneTab === tab ? ' active' : ''}`}
                   type="button"
-                  onClick={() => setDroneTab(tab)}
+                  onClick={() => {
+                    setDroneTab(tab);
+                    if (tab === 'checklist') void loadChecklist(selectedDrone.id);
+                  }}
                 >
                   {label}
                 </button>
@@ -1980,6 +2032,25 @@ export default function HomePage() {
                     <span>Note</span>
                     <textarea name="note" placeholder="How did it fly?" required />
                   </label>
+                  <label className="field">
+                    <span>Battery used</span>
+                    <select name="battery_id">
+                      <option value="">— none —</option>
+                      {batteries.map(b => (
+                        <option key={b.id} value={b.id}>{b.label} ({b.cell_count}S {b.capacity_mah}mAh, {b.cycle_count} cycles)</option>
+                      ))}
+                    </select>
+                  </label>
+                  <div style={{display:'flex',gap:'8px'}}>
+                    <label className="field" style={{flex:1}}>
+                      <span>Duration (min)</span>
+                      <input name="duration_minutes" type="number" min={1} max={600} placeholder="e.g. 8" />
+                    </label>
+                    <label className="field" style={{flex:1}}>
+                      <span>Battery used %</span>
+                      <input name="battery_used_percent" type="number" min={1} max={100} placeholder="e.g. 80" />
+                    </label>
+                  </div>
                   <button className="button secondary" type="submit">Add flight note</button>
                 </form>
               </article>
@@ -2010,6 +2081,21 @@ export default function HomePage() {
                             </div>
                           </div>
                           <p>{note.note}</p>
+                          {(note.battery_id || note.duration_minutes || note.battery_used_percent) && (
+                            <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'4px'}}>
+                              {note.battery_id && batteries.find(b => b.id === note.battery_id) && (
+                                <span className="badge" style={{background:'rgba(96,160,240,0.15)',color:'#60a0f0',fontSize:'0.75rem'}}>
+                                  🔋 {batteries.find(b => b.id === note.battery_id)!.label}
+                                </span>
+                              )}
+                              {note.duration_minutes && (
+                                <span className="badge" style={{fontSize:'0.75rem'}}>⏱ {note.duration_minutes} min</span>
+                              )}
+                              {note.battery_used_percent && (
+                                <span className="badge" style={{fontSize:'0.75rem'}}>⚡ {note.battery_used_percent}% used</span>
+                              )}
+                            </div>
+                          )}
                           <small>{formatDate(note.created_at)}</small>
                         </>
                       )}
@@ -2027,14 +2113,39 @@ export default function HomePage() {
                 <h3>Add maintenance event</h3>
                 <form className="stack" onSubmit={(event) => void handleCreateNote(event, 'maintenance')}>
                   <label className="field">
+                    <span>Event type</span>
+                    <select name="event_type" value={newMaintEventType} onChange={e => setNewMaintEventType(e.target.value)}>
+                      <option value="general">General service</option>
+                      <option value="motor_swap">Motor swap</option>
+                      <option value="prop_change">Prop change</option>
+                      <option value="frame_repair">Frame repair</option>
+                      <option value="fc_flash">FC flash / tune</option>
+                      <option value="crash">💥 Crash report</option>
+                    </select>
+                  </label>
+                  <label className="field">
                     <span>Title</span>
-                    <input name="title" placeholder="Replaced front-left motor" required />
+                    <input name="title" placeholder={newMaintEventType === 'crash' ? 'Crash at the park' : 'Replaced front-left motor'} required />
                   </label>
                   <label className="field">
                     <span>Note</span>
                     <textarea name="note" placeholder="What was changed and why?" required />
                   </label>
-                  <button className="button secondary" type="submit">Add maintenance event</button>
+                  {newMaintEventType === 'crash' && (
+                    <>
+                      <label className="field">
+                        <span>Damaged parts (comma-separated)</span>
+                        <input name="damage_items" placeholder="front-left arm, motor 1, prop" />
+                      </label>
+                      <label className="field">
+                        <span>Repair cost (PLN)</span>
+                        <input name="repair_cost_pln" type="number" min={0} placeholder="e.g. 150" />
+                      </label>
+                    </>
+                  )}
+                  <button className="button secondary" type="submit" style={newMaintEventType === 'crash' ? {background:'rgba(224,64,64,0.15)',color:'#e04040',border:'1px solid rgba(224,64,64,0.3)'} : {}}>
+                    {newMaintEventType === 'crash' ? '💥 Log crash' : 'Add maintenance event'}
+                  </button>
                 </form>
               </article>
               <article className="panel span-8">
@@ -2043,36 +2154,172 @@ export default function HomePage() {
                   <p style={{color:'var(--text-muted)',fontSize:'0.88rem'}}>No maintenance events yet.</p>
                 )}
                 <div className="note-list">
-                  {selectedDrone.maintenance_events.map((note) => (
-                    <div key={note.id} className="card">
-                      {editingNoteId === note.id && editingNoteTab === 'maintenance' ? (
-                        <form className="stack" style={{gap:'6px'}} onSubmit={(e) => void handleUpdateNote(e, selectedDroneId!, note.id, 'maintenance')}>
-                          <input name="title" defaultValue={note.title} required style={{padding:'4px 8px',fontSize:'0.85rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)'}} />
-                          <textarea name="note" defaultValue={note.note} required rows={3} style={{padding:'4px 8px',fontSize:'0.85rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)',resize:'vertical'}} />
-                          <div style={{display:'flex',gap:'6px'}}>
-                            <button className="button secondary" type="submit" style={{padding:'3px 10px',fontSize:'0.8rem'}}>Save</button>
-                            <button className="button ghost" type="button" style={{padding:'3px 10px',fontSize:'0.8rem'}} onClick={() => { setEditingNoteId(null); setEditingNoteTab(null); }}>Cancel</button>
-                          </div>
-                        </form>
-                      ) : (
-                        <>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                            <strong>{note.title}</strong>
-                            <div style={{display:'flex',gap:'4px'}}>
-                              <button className="button ghost" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => { setEditingNoteId(note.id); setEditingNoteTab('maintenance'); }}>Edit</button>
-                              <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'maintenance')}>✕</button>
+                  {selectedDrone.maintenance_events.map((note) => {
+                    const isCrash = note.event_type === 'crash';
+                    const typeLabels: Record<string, string> = {
+                      general: 'Service', motor_swap: 'Motor swap', prop_change: 'Prop change',
+                      frame_repair: 'Frame repair', fc_flash: 'FC flash', crash: '💥 Crash',
+                    };
+                    const typeLabel = typeLabels[note.event_type ?? 'general'] ?? note.event_type ?? 'Service';
+                    return (
+                      <div key={note.id} className="card" style={isCrash ? {borderLeft:'3px solid #e04040'} : {}}>
+                        {editingNoteId === note.id && editingNoteTab === 'maintenance' ? (
+                          <form className="stack" style={{gap:'6px'}} onSubmit={(e) => void handleUpdateNote(e, selectedDroneId!, note.id, 'maintenance')}>
+                            <input name="title" defaultValue={note.title} required style={{padding:'4px 8px',fontSize:'0.85rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)'}} />
+                            <textarea name="note" defaultValue={note.note} required rows={3} style={{padding:'4px 8px',fontSize:'0.85rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)',resize:'vertical'}} />
+                            <div style={{display:'flex',gap:'6px'}}>
+                              <button className="button secondary" type="submit" style={{padding:'3px 10px',fontSize:'0.8rem'}}>Save</button>
+                              <button className="button ghost" type="button" style={{padding:'3px 10px',fontSize:'0.8rem'}} onClick={() => { setEditingNoteId(null); setEditingNoteTab(null); }}>Cancel</button>
                             </div>
-                          </div>
-                          <p>{note.note}</p>
-                          <small>{formatDate(note.created_at)}</small>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                          </form>
+                        ) : (
+                          <>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                              <div style={{display:'flex',gap:'6px',alignItems:'center',flexWrap:'wrap'}}>
+                                <strong>{note.title}</strong>
+                                <span className="badge" style={isCrash ? {background:'rgba(224,64,64,0.15)',color:'#e04040',fontSize:'0.73rem'} : {fontSize:'0.73rem'}}>{typeLabel}</span>
+                              </div>
+                              <div style={{display:'flex',gap:'4px'}}>
+                                <button className="button ghost" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => { setEditingNoteId(note.id); setEditingNoteTab('maintenance'); }}>Edit</button>
+                                <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'maintenance')}>✕</button>
+                              </div>
+                            </div>
+                            <p>{note.note}</p>
+                            {isCrash && (note.damage_items || note.repair_cost_pln) && (
+                              <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'4px',padding:'6px 8px',background:'rgba(224,64,64,0.06)',borderRadius:'4px'}}>
+                                {note.damage_items && (
+                                  <span style={{fontSize:'0.8rem',color:'var(--text-muted)'}}>
+                                    <strong>Damaged:</strong> {note.damage_items}
+                                  </span>
+                                )}
+                                {note.repair_cost_pln && (
+                                  <span style={{fontSize:'0.8rem',color:'#f0a830'}}>
+                                    <strong>Repair cost:</strong> {note.repair_cost_pln} PLN
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            <small>{formatDate(note.created_at)}</small>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </article>
             </section>
           )}
+
+          {/* ── CHECKLIST TAB ── */}
+          {droneTab === 'checklist' && (() => {
+            const items = checklistItems[selectedDrone.id] ?? [];
+            const requiredItems = items.filter(i => i.is_required);
+            const allChecked = requiredItems.length > 0 && requiredItems.every(i => checklistChecked[`${selectedDrone.id}-${i.id}`]);
+            const goNoGo = items.length === 0 ? null : allChecked ? 'go' : 'no-go';
+
+            async function handleAddChecklistItem(e: FormEvent<HTMLFormElement>) {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              try {
+                await apiFetch<PreflightItem>(`/api/drones/${selectedDrone!.id}/checklist`, {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    label: fd.get('label'),
+                    is_required: fd.get('is_required') === 'on',
+                    order_idx: items.length,
+                  }),
+                });
+                await loadChecklist(selectedDrone!.id);
+                (e.target as HTMLFormElement).reset();
+              } catch (error) { setErr((error as Error).message); }
+            }
+
+            async function handleDeleteChecklistItem(itemId: number) {
+              try {
+                await apiFetch(`/api/drones/${selectedDrone!.id}/checklist/${itemId}`, { method: 'DELETE' });
+                await loadChecklist(selectedDrone!.id);
+              } catch (error) { setErr((error as Error).message); }
+            }
+
+            return (
+              <section className="content-grid">
+                <article className="panel span-4">
+                  <h3>Add checklist item</h3>
+                  <form className="stack" onSubmit={(e) => void handleAddChecklistItem(e)}>
+                    <label className="field">
+                      <span>Item label</span>
+                      <input name="label" placeholder="Props tight? Motors clear?" required />
+                    </label>
+                    <label style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'0.88rem',cursor:'pointer'}}>
+                      <input name="is_required" type="checkbox" defaultChecked />
+                      <span>Required (blocks Go status)</span>
+                    </label>
+                    <button className="button secondary" type="submit">Add item</button>
+                  </form>
+                  {items.length === 0 && (
+                    <div style={{marginTop:'16px'}}>
+                      <p style={{color:'var(--text-muted)',fontSize:'0.85rem',marginBottom:'8px'}}>No checklist yet. Some starting ideas:</p>
+                      {['Props tight and undamaged', 'Motors spin freely', 'Betaflight backup current', 'Failsafe tested', 'Battery fully charged', 'GPS rescue active (if LR)', 'Remote ID module active'].map(hint => (
+                        <button key={hint} className="button ghost" style={{display:'block',width:'100%',textAlign:'left',fontSize:'0.8rem',padding:'4px 8px',marginBottom:'4px'}} type="button"
+                          onClick={() => { const el = document.querySelector('input[name=label]') as HTMLInputElement; if(el) { el.value = hint; el.focus(); } }}>
+                          + {hint}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </article>
+                <article className="panel span-8">
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
+                    <h3 style={{margin:0}}>Pre-flight checklist — {selectedDrone.name}</h3>
+                    {goNoGo !== null && (
+                      <span className="badge" style={{
+                        padding:'4px 12px',fontSize:'0.88rem',fontWeight:700,letterSpacing:'0.05em',
+                        background: goNoGo === 'go' ? 'rgba(79,195,138,0.2)' : 'rgba(224,64,64,0.2)',
+                        color: goNoGo === 'go' ? '#4fc38a' : '#e04040',
+                        border: `1px solid ${goNoGo === 'go' ? 'rgba(79,195,138,0.4)' : 'rgba(224,64,64,0.4)'}`,
+                      }}>
+                        {goNoGo === 'go' ? '✅ GO' : '🚫 NO-GO'}
+                      </span>
+                    )}
+                  </div>
+                  {items.length === 0 && (
+                    <p style={{color:'var(--text-muted)',fontSize:'0.88rem'}}>Add checklist items to the left to create a pre-flight routine.</p>
+                  )}
+                  <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                    {items.map(item => {
+                      const key = `${selectedDrone.id}-${item.id}`;
+                      const checked = !!checklistChecked[key];
+                      return (
+                        <div key={item.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'var(--surface2)',borderRadius:'6px',border:`1px solid ${checked ? 'rgba(79,195,138,0.4)' : 'var(--border)'}`}}>
+                          <input type="checkbox" checked={checked} onChange={e => setChecklistChecked(prev => ({...prev, [key]: e.target.checked}))}
+                            style={{width:'18px',height:'18px',cursor:'pointer',flexShrink:0}} />
+                          <span style={{flex:1,fontSize:'0.9rem',textDecoration:checked ? 'line-through' : 'none',color:checked ? 'var(--text-muted)' : 'var(--text)'}}>{item.label}</span>
+                          {item.is_required && <span className="badge" style={{fontSize:'0.7rem',background:'rgba(240,168,48,0.12)',color:'#f0a830'}}>required</span>}
+                          <button className="button danger" type="button" style={{padding:'2px 6px',fontSize:'0.72rem'}} onClick={() => void handleDeleteChecklistItem(item.id)}>✕</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {items.length > 0 && (
+                    <div style={{marginTop:'12px',display:'flex',gap:'8px'}}>
+                      <button className="button ghost" type="button" style={{fontSize:'0.8rem'}}
+                        onClick={() => {
+                          const newChecked: Record<string, boolean> = {...checklistChecked};
+                          items.forEach(i => { newChecked[`${selectedDrone.id}-${i.id}`] = true; });
+                          setChecklistChecked(newChecked);
+                        }}>Check all</button>
+                      <button className="button ghost" type="button" style={{fontSize:'0.8rem'}}
+                        onClick={() => {
+                          const newChecked: Record<string, boolean> = {...checklistChecked};
+                          items.forEach(i => { newChecked[`${selectedDrone.id}-${i.id}`] = false; });
+                          setChecklistChecked(newChecked);
+                        }}>Reset</button>
+                    </div>
+                  )}
+                </article>
+              </section>
+            );
+          })()}
 
           {/* ── COMPARE TAB ── */}
           {droneTab === 'compare' && (
