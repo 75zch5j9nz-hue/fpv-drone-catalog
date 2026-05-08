@@ -100,6 +100,19 @@ type CompareResponse = {
   diff: string;
 };
 
+type AppStats = {
+  drones: { total: number; flyable: number; grounded: number };
+  snapshots: number;
+  batteries: number;
+  products: number;
+  flights: number;
+  maintenance: number;
+  by_video: Record<string, number>;
+  by_category: Record<string, number>;
+};
+
+type DroneReadiness = 'ready' | 'needs_backup' | 'incomplete' | 'grounded';
+
 // ── Catalogue types ────────────────────────────────────────────────────────────
 
 type ComponentRole =
@@ -281,6 +294,37 @@ const STATUS_META: Record<DroneStatus, {label: string; color: string; bg: string
   for_parts:      { label: 'For parts',     color: '#7a8599', bg: 'rgba(122,133,153,0.12)' },
 };
 
+const READINESS_META: Record<DroneReadiness, { label: string; color: string; bg: string }> = {
+  ready: { label: 'Ready', color: '#4fc38a', bg: 'rgba(79,195,138,0.16)' },
+  needs_backup: { label: 'Needs backup', color: '#60a0f0', bg: 'rgba(96,160,240,0.16)' },
+  incomplete: { label: 'Incomplete', color: '#f0a830', bg: 'rgba(240,168,48,0.16)' },
+  grounded: { label: 'Grounded', color: '#e04040', bg: 'rgba(224,64,64,0.16)' },
+};
+
+function normalizeCategory(value: string | null): string {
+  return (value ?? '').toLowerCase().replace(/_/g, '-').trim();
+}
+
+function getDroneIssues(drone: Drone): string[] {
+  const issues: string[] = [];
+  if (!drone.snapshots.length) issues.push('No Betaflight snapshot');
+  if (!drone.auw_grams) issues.push('Missing AUW');
+  if (!drone.radio_link) issues.push('Missing radio link');
+  if (!drone.stack && !drone.fc_target) issues.push('Missing stack / FC');
+  if (!drone.video_system) issues.push('Missing video system');
+  return issues;
+}
+
+function getDroneReadiness(drone: Drone): DroneReadiness {
+  if (drone.status !== 'flyable') return 'grounded';
+  const issues = getDroneIssues(drone);
+  const hasBackupGap = issues.includes('No Betaflight snapshot');
+  const nonBackupIssues = issues.filter(issue => issue !== 'No Betaflight snapshot');
+  if (nonBackupIssues.length) return 'incomplete';
+  if (hasBackupGap) return 'needs_backup';
+  return 'ready';
+}
+
 export default function HomePage() {
   const pathname = usePathname();
   const isOverviewPage = pathname === '/';
@@ -297,6 +341,7 @@ export default function HomePage() {
   const [fleetFilter, setFleetFilter] = useState<DroneStatus | 'all'>('all');
   const [fleetSearch, setFleetSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [readinessFilter, setReadinessFilter] = useState<DroneReadiness | 'all'>('all');
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editingNoteTab, setEditingNoteTab] = useState<'flights' | 'maintenance' | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -319,6 +364,7 @@ export default function HomePage() {
   const [catFilter, setCatFilter] = useState<{ mfr: string; role: string; search: string }>({ mfr: '', role: '', search: '' });
   const [catLoaded, setCatLoaded] = useState(false);
   const [selectedCatProduct, setSelectedCatProduct] = useState<CatalogueProduct | null>(null);
+  const [appStats, setAppStats] = useState<AppStats | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
   const [addingRole, setAddingRole] = useState<ComponentRole | null>(null);
   // Custom part form
@@ -379,6 +425,9 @@ export default function HomePage() {
       ]);
     });
   }, []);
+  useEffect(() => {
+    apiFetch<AppStats>('/api/stats').then(setAppStats).catch(() => {});
+  }, [drones, batteries]);
 
   async function loadCatalogue(): Promise<CatalogueProduct[]> {
     if (catLoaded) return catalogue;
@@ -944,7 +993,7 @@ export default function HomePage() {
           <div className="stat-strip">
             <div className="stat-card">
               <span className="stat-value">{drones.length}</span>
-              <span className="stat-label">Total Drones</span>
+              <span className="stat-label">Drones</span>
             </div>
             <div className="stat-card stat-green">
               <span className="stat-value">{drones.filter(d => d.status === 'flyable').length}</span>
@@ -958,7 +1007,26 @@ export default function HomePage() {
               <span className="stat-value">{batteries.length}</span>
               <span className="stat-label">Batteries</span>
             </div>
+            <div className="stat-card">
+              <span className="stat-value">{appStats ? String((appStats.products as number) ?? '0') : '0'}</span>
+              <span className="stat-label">Parts</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value">{appStats ? String(((appStats.drones as Record<string, number>)?.grounded) ?? 0) : '0'}</span>
+              <span className="stat-label">Grounded</span>
+            </div>
           </div>
+
+          {appStats && drones.length > 0 && (
+            <div style={{display:'flex',flexWrap:'wrap',gap:'6px',margin:'0 0 14px'}}>
+              {Object.entries((appStats.by_video ?? {}) as Record<string, number>).map(([system, count]) => (
+                <span key={system} className="badge" style={{fontSize:'0.75rem',padding:'3px 10px'}}>{system}: <strong>{count}</strong></span>
+              ))}
+              {Object.entries((appStats.by_category ?? {}) as Record<string, number>).map(([category, count]) => (
+                <span key={category} className="badge warm" style={{fontSize:'0.75rem',padding:'3px 10px'}}>{category.replace(/_/g, '-')}: <strong>{count}</strong></span>
+              ))}
+            </div>
+          )}
 
           <div className="quick-nav">
             <Link href="/drones" className="quick-card">
@@ -984,13 +1052,48 @@ export default function HomePage() {
           </div>
 
           {drones.length > 0 && (
+            <div className="panel" style={{marginBottom:'18px'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',marginBottom:'10px'}}>
+                <h3 style={{margin:0}}>Action queue</h3>
+                <span style={{fontSize:'0.8rem',color:'var(--text-muted)'}}>Highest-value fixes first</span>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'10px'}}>
+                {[...drones]
+                  .filter(drone => getDroneReadiness(drone) !== 'ready')
+                  .sort((a, b) => getDroneIssues(b).length - getDroneIssues(a).length)
+                  .slice(0, 4)
+                  .map(drone => {
+                    const readiness = getDroneReadiness(drone);
+                    const meta = READINESS_META[readiness];
+                    const issues = getDroneIssues(drone);
+                    return (
+                      <div key={drone.id} className="card" style={{textAlign:'left'}}>
+                        <div style={{display:'flex',justifyContent:'space-between',gap:'8px',alignItems:'flex-start',marginBottom:'6px'}}>
+                          <strong style={{lineHeight:1.3}}>{drone.name}</strong>
+                          <span className="badge" style={{background:meta.bg,color:meta.color,whiteSpace:'nowrap'}}>{meta.label}</span>
+                        </div>
+                        <div style={{display:'flex',flexWrap:'wrap',gap:'5px',marginBottom:'8px'}}>
+                          {issues.map(issue => <span key={issue} className="badge" style={{fontSize:'0.72rem'}}>{issue}</span>)}
+                        </div>
+                        <button className="button ghost" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => setSelectedDroneId(drone.id)}>Open drone</button>
+                      </div>
+                    );
+                  })}
+                {[...drones].filter(drone => getDroneReadiness(drone) !== 'ready').length === 0 && (
+                  <div style={{color:'var(--text-muted)',fontSize:'0.85rem'}}>All drones are ready or only need routine logging.</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {drones.length > 0 && (
             <div className="recent-section">
               <div className="recent-header">
                 <h3>Recent Drones</h3>
                 <Link href="/drones" className="see-all-link">View all {drones.length} →</Link>
               </div>
               <div className="recent-list">
-                {drones.slice(0, 6).map(d => (
+                {[...drones].sort((a, b) => (a.status === 'flyable' ? 0 : 1) - (b.status === 'flyable' ? 0 : 1)).slice(0, 6).map(d => (
                   <Link key={d.id} href="/drones" className="recent-item">
                     {d.image_url
                       ? <img src={d.image_url} alt="" className="recent-thumb" />
@@ -1165,20 +1268,24 @@ export default function HomePage() {
 
           {createStep === 2 && (
             <div className="stack">
-              <div style={{display:'flex',gap:'6px',flexWrap:'wrap',alignItems:'center'}}>
-                <input type="text" placeholder="Search parts…" value={catFilter.search}
-                  onChange={e => setCatFilter(f => ({...f, search: e.target.value}))}
-                  style={{flex:1,minWidth:120,padding:'5px 9px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
-                <select value={catFilter.mfr} onChange={e => setCatFilter(f => ({...f, mfr: e.target.value}))}
-                  style={{padding:'5px 8px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}}>
-                  <option value="">All brands</option>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',marginBottom:'2px'}}>
+                <span style={{fontSize:'0.8rem',color:'var(--text-muted)'}}>Build configuration for {createBasicData['name'] || 'new drone'}</span>
+                <button className="button ghost" type="button" style={{padding:'3px 8px',fontSize:'0.75rem'}} onClick={() => loadCatalogue().catch(() => {})}>↻ Reload catalogue</button>
+              </div>
+              <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                <select value={catFilter.mfr} onChange={e => setCatFilter(prev => ({...prev, mfr: e.target.value}))}
+                  style={{flex:'1 1 120px',padding:'5px 8px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}}>
+                  <option value="">All manufacturers</option>
                   {manufacturers.map(m => <option key={m.id} value={String(m.id)}>{m.name}</option>)}
                 </select>
-                <select value={catFilter.role} onChange={e => setCatFilter(f => ({...f, role: e.target.value}))}
-                  style={{padding:'5px 8px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}}>
+                <select value={catFilter.role} onChange={e => setCatFilter(prev => ({...prev, role: e.target.value}))}
+                  style={{flex:'1 1 120px',padding:'5px 8px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}}>
                   <option value="">All roles</option>
                   {ALL_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                 </select>
+                <input type="text" placeholder="Search parts…" value={catFilter.search}
+                  onChange={e => setCatFilter(prev => ({...prev, search: e.target.value}))}
+                  style={{flex:'2 1 180px',padding:'5px 9px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
               </div>
               {!catLoaded ? (
                 <div style={{color:'var(--text-muted)',fontSize:'0.85rem',padding:'16px 0'}}>Loading catalogue…</div>
@@ -1369,9 +1476,17 @@ export default function HomePage() {
           </div>
           <div style={{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'10px'}}>
             <span style={{fontSize:'0.72rem',color:'var(--text-muted)',alignSelf:'center',marginRight:'2px'}}>Cat:</span>
-            {(['all','freestyle','cinematic','long-range','racing','other'] as const).map((c) => (
+            {(['all','freestyle','cinewhoop','long-range','racing','other'] as const).map((c) => (
               <button key={c} className={`button ghost${categoryFilter === c ? ' active' : ''}`} type="button" style={{padding:'3px 8px',fontSize:'0.72rem'}} onClick={() => setCategoryFilter(c)}>
-                {c === 'all' ? 'All' : c}
+                {c === 'all' ? 'All' : c === 'cinewhoop' ? 'Cinewhoop' : c === 'long-range' ? 'Long-range' : c}
+              </button>
+            ))}
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'10px'}}>
+            <span style={{fontSize:'0.72rem',color:'var(--text-muted)',alignSelf:'center',marginRight:'2px'}}>Readiness:</span>
+            {(['all', 'ready', 'needs_backup', 'incomplete', 'grounded'] as const).map((value) => (
+              <button key={value} className={`button ghost${readinessFilter === value ? ' active' : ''}`} type="button" style={{padding:'3px 8px',fontSize:'0.72rem'}} onClick={() => setReadinessFilter(value)}>
+                {value === 'all' ? 'All' : READINESS_META[value].label}
               </button>
             ))}
           </div>
@@ -1379,9 +1494,11 @@ export default function HomePage() {
             {drones.filter((d) => {
               if (fleetFilter !== 'all' && d.status !== fleetFilter) return false;
               if (categoryFilter !== 'all') {
-                const cat = (d.category ?? '').toLowerCase();
-                if (!cat.includes(categoryFilter)) return false;
+                const cat = normalizeCategory(d.category);
+                const needle = categoryFilter.toLowerCase();
+                if (!cat.includes(needle)) return false;
               }
+              if (readinessFilter !== 'all' && getDroneReadiness(d) !== readinessFilter) return false;
               if (fleetSearch.trim()) {
                 const q = fleetSearch.trim().toLowerCase();
                 if (!d.name.toLowerCase().includes(q) && !(d.frame ?? '').toLowerCase().includes(q)) return false;
@@ -1389,6 +1506,8 @@ export default function HomePage() {
               return true;
             }).map((drone) => {
               const sm = STATUS_META[drone.status as DroneStatus] ?? STATUS_META.flyable;
+              const readiness = getDroneReadiness(drone);
+              const readinessMeta = READINESS_META[readiness];
               return (
               <Fragment key={drone.id}>
               <button
@@ -1420,6 +1539,7 @@ export default function HomePage() {
                     </div>
                     <div className="badge-row" style={{marginTop:'4px'}}>
                       <span className="badge" style={{background:sm.bg,color:sm.color}}>{sm.label}</span>
+                      <span className="badge" style={{background:readinessMeta.bg,color:readinessMeta.color}}>{readinessMeta.label}</span>
                       {drone.auw_grams ? <span className="badge">{drone.auw_grams}g</span> : null}
                     </div>
                   </div>
@@ -1478,6 +1598,7 @@ export default function HomePage() {
                       <span className="badge">Snapshots: {drone.snapshots.length}</span>
                       <span className="badge">Flights: {drone.flight_notes.length}</span>
                       <span className="badge">Maintenance: {drone.maintenance_events.length}</span>
+                      {getDroneIssues(drone).map(issue => <span key={issue} className="badge warm">{issue}</span>)}
                     </div>
                   </div>
                 )}

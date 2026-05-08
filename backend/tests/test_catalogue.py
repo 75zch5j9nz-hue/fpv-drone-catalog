@@ -268,3 +268,18 @@ def test_hardware_history_includes_removed_components():
     status, history = _api(f"/api/drones/{drone['id']}/components/history")
     assert status == 200
     assert any(c["id"] == comp_id and c["removed_at"] is not None for c in history)
+
+
+def test_stats_endpoint_exposes_operational_summary():
+    status, stats = _api("/api/stats")
+    assert status == 200
+    assert stats["drones"]["total"] >= 1
+    assert stats["drones"]["flyable"] >= 0
+    assert stats["drones"]["grounded"] >= 0
+    assert isinstance(stats["snapshots"], int)
+    assert isinstance(stats["batteries"], int)
+    assert isinstance(stats["products"], int)
+    assert isinstance(stats["flights"], int)
+    assert isinstance(stats["maintenance"], int)
+    assert isinstance(stats["by_video"], dict)
+    assert isinstance(stats["by_category"], dict)

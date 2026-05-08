@@ -199,6 +199,45 @@ def health(db: Session = Depends(get_db)) -> dict[str, str]:
 
 
 _PROXY_ALLOWED_HOST = "iflight.oss-cn-hongkong.aliyuncs.com"
+
+
+@app.get("/api/stats")
+def get_stats(db: Session = Depends(get_db)) -> dict:
+    from sqlalchemy import func
+    total_drones = db.execute(select(func.count()).select_from(Drone)).scalar_one()
+    flyable = db.execute(select(func.count()).select_from(Drone).where(Drone.status == "flyable")).scalar_one()
+    total_snapshots = db.execute(select(func.count()).select_from(Snapshot)).scalar_one()
+    total_batteries = db.execute(select(func.count()).select_from(Battery)).scalar_one()
+    total_products = db.execute(select(func.count()).select_from(Product)).scalar_one()
+    total_flights = db.execute(select(func.count()).select_from(FlightNote)).scalar_one()
+    total_maintenance = db.execute(select(func.count()).select_from(MaintenanceEvent)).scalar_one()
+    # Video system breakdown
+    video_rows = db.execute(
+        select(Drone.video_system, func.count().label("cnt"))
+        .where(Drone.video_system.isnot(None))
+        .group_by(Drone.video_system)
+        .order_by(func.count().desc())
+    ).all()
+    # Category breakdown
+    cat_rows = db.execute(
+        select(Drone.category, func.count().label("cnt"))
+        .where(Drone.category.isnot(None))
+        .group_by(Drone.category)
+        .order_by(func.count().desc())
+    ).all()
+    return {
+        "drones": {"total": total_drones, "flyable": flyable, "grounded": total_drones - flyable},
+        "snapshots": total_snapshots,
+        "batteries": total_batteries,
+        "products": total_products,
+        "flights": total_flights,
+        "maintenance": total_maintenance,
+        "by_video": {row.video_system: row.cnt for row in video_rows},
+        "by_category": {row.category: row.cnt for row in cat_rows},
+    }
+
+
+_PROXY_ALLOWED_HOST = "iflight.oss-cn-hongkong.aliyuncs.com"
 _PROXY_REFERER = "https://shop.iflight.com/"
 
 
