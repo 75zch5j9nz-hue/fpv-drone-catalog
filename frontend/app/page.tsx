@@ -295,6 +295,10 @@ export default function HomePage() {
   const [editDroneId, setEditDroneId] = useState<number | null>(null);
   const [editSnapshotId, setEditSnapshotId] = useState<number | null>(null);
   const [fleetFilter, setFleetFilter] = useState<DroneStatus | 'all'>('all');
+  const [fleetSearch, setFleetSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [editingNoteTab, setEditingNoteTab] = useState<'flights' | 'maintenance' | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [templateBrand, setTemplateBrand] = useState('');
   const [templateSearch, setTemplateSearch] = useState('');
@@ -660,6 +664,23 @@ export default function HomePage() {
       await apiFetch(`/api/drones/${droneId}/${type}/${noteId}`, { method: 'DELETE' });
       await loadDrones(droneId);
       setOk('Note deleted.');
+    } catch (error) {
+      setErr((error as Error).message);
+    }
+  }
+
+  async function handleUpdateNote(event: FormEvent<HTMLFormElement>, droneId: number, noteId: number, type: 'flights' | 'maintenance') {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    try {
+      await apiFetch(`/api/drones/${droneId}/${type}/${noteId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title: formData.get('title'), note: formData.get('note') }),
+      });
+      setEditingNoteId(null);
+      setEditingNoteTab(null);
+      await loadDrones(droneId);
+      setOk('Note updated.');
     } catch (error) {
       setErr((error as Error).message);
     }
@@ -1328,18 +1349,45 @@ export default function HomePage() {
         </article>
 
         <article className="panel span-8">
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}}>
             <h2 style={{margin:0}}>Drone fleet</h2>
-            <div className="badge-row" style={{gap:'4px'}}>
-              {(['all', 'flyable', 'needs_repair', 'grounded_crash', 'in_build', 'retired', 'for_parts'] as const).map((f) => (
-                <button key={f} className={`button ghost${fleetFilter === f ? ' active' : ''}`} type="button" style={{padding:'3px 8px',fontSize:'0.75rem'}} onClick={() => setFleetFilter(f)}>
-                  {f === 'all' ? 'All' : (STATUS_META[f as DroneStatus]?.label ?? f)}
-                </button>
-              ))}
-            </div>
+            <input
+              type="search"
+              placeholder="Search by name…"
+              value={fleetSearch}
+              onChange={e => setFleetSearch(e.target.value)}
+              style={{padding:'4px 10px',fontSize:'0.8rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)',width:'160px'}}
+            />
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'8px'}}>
+            <span style={{fontSize:'0.72rem',color:'var(--text-muted)',alignSelf:'center',marginRight:'2px'}}>Status:</span>
+            {(['all', 'flyable', 'needs_repair', 'grounded_crash', 'in_build', 'retired', 'for_parts'] as const).map((f) => (
+              <button key={f} className={`button ghost${fleetFilter === f ? ' active' : ''}`} type="button" style={{padding:'3px 8px',fontSize:'0.72rem'}} onClick={() => setFleetFilter(f)}>
+                {f === 'all' ? 'All' : (STATUS_META[f as DroneStatus]?.label ?? f)}
+              </button>
+            ))}
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'10px'}}>
+            <span style={{fontSize:'0.72rem',color:'var(--text-muted)',alignSelf:'center',marginRight:'2px'}}>Cat:</span>
+            {(['all','freestyle','cinematic','long-range','racing','other'] as const).map((c) => (
+              <button key={c} className={`button ghost${categoryFilter === c ? ' active' : ''}`} type="button" style={{padding:'3px 8px',fontSize:'0.72rem'}} onClick={() => setCategoryFilter(c)}>
+                {c === 'all' ? 'All' : c}
+              </button>
+            ))}
           </div>
           <div className="drone-list">
-            {drones.filter((d) => fleetFilter === 'all' || d.status === fleetFilter).map((drone) => {
+            {drones.filter((d) => {
+              if (fleetFilter !== 'all' && d.status !== fleetFilter) return false;
+              if (categoryFilter !== 'all') {
+                const cat = (d.category ?? '').toLowerCase();
+                if (!cat.includes(categoryFilter)) return false;
+              }
+              if (fleetSearch.trim()) {
+                const q = fleetSearch.trim().toLowerCase();
+                if (!d.name.toLowerCase().includes(q) && !(d.frame ?? '').toLowerCase().includes(q)) return false;
+              }
+              return true;
+            }).map((drone) => {
               const sm = STATUS_META[drone.status as DroneStatus] ?? STATUS_META.flyable;
               return (
               <Fragment key={drone.id}>
@@ -1822,12 +1870,28 @@ export default function HomePage() {
                 <div className="note-list">
                   {selectedDrone.flight_notes.map((note) => (
                     <div key={note.id} className="card">
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                        <strong>{note.title}</strong>
-                        <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'flights')}>✕</button>
-                      </div>
-                      <p>{note.note}</p>
-                      <small>{formatDate(note.created_at)}</small>
+                      {editingNoteId === note.id && editingNoteTab === 'flights' ? (
+                        <form className="stack" style={{gap:'6px'}} onSubmit={(e) => void handleUpdateNote(e, selectedDroneId!, note.id, 'flights')}>
+                          <input name="title" defaultValue={note.title} required style={{padding:'4px 8px',fontSize:'0.85rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)'}} />
+                          <textarea name="note" defaultValue={note.note} required rows={3} style={{padding:'4px 8px',fontSize:'0.85rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)',resize:'vertical'}} />
+                          <div style={{display:'flex',gap:'6px'}}>
+                            <button className="button secondary" type="submit" style={{padding:'3px 10px',fontSize:'0.8rem'}}>Save</button>
+                            <button className="button ghost" type="button" style={{padding:'3px 10px',fontSize:'0.8rem'}} onClick={() => { setEditingNoteId(null); setEditingNoteTab(null); }}>Cancel</button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                            <strong>{note.title}</strong>
+                            <div style={{display:'flex',gap:'4px'}}>
+                              <button className="button ghost" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => { setEditingNoteId(note.id); setEditingNoteTab('flights'); }}>Edit</button>
+                              <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'flights')}>✕</button>
+                            </div>
+                          </div>
+                          <p>{note.note}</p>
+                          <small>{formatDate(note.created_at)}</small>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1860,12 +1924,28 @@ export default function HomePage() {
                 <div className="note-list">
                   {selectedDrone.maintenance_events.map((note) => (
                     <div key={note.id} className="card">
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                        <strong>{note.title}</strong>
-                        <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'maintenance')}>✕</button>
-                      </div>
-                      <p>{note.note}</p>
-                      <small>{formatDate(note.created_at)}</small>
+                      {editingNoteId === note.id && editingNoteTab === 'maintenance' ? (
+                        <form className="stack" style={{gap:'6px'}} onSubmit={(e) => void handleUpdateNote(e, selectedDroneId!, note.id, 'maintenance')}>
+                          <input name="title" defaultValue={note.title} required style={{padding:'4px 8px',fontSize:'0.85rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)'}} />
+                          <textarea name="note" defaultValue={note.note} required rows={3} style={{padding:'4px 8px',fontSize:'0.85rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)',resize:'vertical'}} />
+                          <div style={{display:'flex',gap:'6px'}}>
+                            <button className="button secondary" type="submit" style={{padding:'3px 10px',fontSize:'0.8rem'}}>Save</button>
+                            <button className="button ghost" type="button" style={{padding:'3px 10px',fontSize:'0.8rem'}} onClick={() => { setEditingNoteId(null); setEditingNoteTab(null); }}>Cancel</button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                            <strong>{note.title}</strong>
+                            <div style={{display:'flex',gap:'4px'}}>
+                              <button className="button ghost" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => { setEditingNoteId(note.id); setEditingNoteTab('maintenance'); }}>Edit</button>
+                              <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'maintenance')}>✕</button>
+                            </div>
+                          </div>
+                          <p>{note.note}</p>
+                          <small>{formatDate(note.created_at)}</small>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>

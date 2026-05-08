@@ -30,6 +30,9 @@ from .schemas import (
     DroneUpdate,
     FlightNoteCreate,
     FlightNoteOut,
+    FlightNoteUpdate,
+    MaintenanceEventUpdate,
+    ProductUpdate,
     InstalledComponentCreate,
     InstalledComponentOut,
     MaintenanceEventCreate,
@@ -552,6 +555,20 @@ def create_flight_note(drone_id: int, payload: FlightNoteCreate, db: Session = D
     return note
 
 
+@app.patch("/api/drones/{drone_id}/flights/{note_id}", response_model=FlightNoteOut)
+def update_flight_note(drone_id: int, note_id: int, payload: FlightNoteUpdate, db: Session = Depends(get_db)) -> FlightNote:
+    note = db.execute(select(FlightNote).where(FlightNote.id == note_id, FlightNote.drone_id == drone_id)).scalar_one_or_none()
+    if not note:
+        raise HTTPException(status_code=404, detail="Flight note not found")
+    if payload.title is not None:
+        note.title = payload.title
+    if payload.note is not None:
+        note.note = payload.note
+    db.commit()
+    db.refresh(note)
+    return note
+
+
 @app.delete("/api/drones/{drone_id}/flights/{note_id}", status_code=204)
 def delete_flight_note(drone_id: int, note_id: int, db: Session = Depends(get_db)) -> None:
     note = db.execute(select(FlightNote).where(FlightNote.id == note_id, FlightNote.drone_id == drone_id)).scalar_one_or_none()
@@ -572,6 +589,20 @@ def create_maintenance_event(drone_id: int, payload: MaintenanceEventCreate, db:
     drone = get_drone_or_404(db, drone_id)
     event = MaintenanceEvent(drone_id=drone.id, title=payload.title, note=payload.note)
     db.add(event)
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+@app.patch("/api/drones/{drone_id}/maintenance/{event_id}", response_model=MaintenanceEventOut)
+def update_maintenance_event(drone_id: int, event_id: int, payload: MaintenanceEventUpdate, db: Session = Depends(get_db)) -> MaintenanceEvent:
+    event = db.execute(select(MaintenanceEvent).where(MaintenanceEvent.id == event_id, MaintenanceEvent.drone_id == drone_id)).scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Maintenance event not found")
+    if payload.title is not None:
+        event.title = payload.title
+    if payload.note is not None:
+        event.note = payload.note
     db.commit()
     db.refresh(event)
     return event
@@ -795,6 +826,17 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db)) -> Pro
         db.add(variant)
     db.commit()
     return db.execute(_product_query().where(Product.id == product.id)).scalar_one()
+
+
+@app.patch("/api/products/{product_id}", response_model=ProductOut)
+def update_product(product_id: int, payload: ProductUpdate, db: Session = Depends(get_db)) -> Product:
+    product = db.execute(select(Product).where(Product.id == product_id)).scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(product, field, value)
+    db.commit()
+    return db.execute(_product_query().where(Product.id == product_id)).scalar_one()
 
 
 @app.post("/api/products/{product_id}/variants", response_model=ProductVariantOut, status_code=201)

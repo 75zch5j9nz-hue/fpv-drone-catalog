@@ -248,9 +248,30 @@ class FlightNoteCreate(BaseModel):
     note: str = Field(min_length=1)
 
 
+class FlightNoteUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    note: str | None = Field(default=None, min_length=1)
+
+
 class MaintenanceEventCreate(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     note: str = Field(min_length=1)
+
+
+class MaintenanceEventUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    note: str | None = Field(default=None, min_length=1)
+
+
+class ProductUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    manufacturer_id: int | None = None
+    category_id: int | None = None
+    description: str | None = None
+    tags: str | None = None
+    image_url: str | None = None
+    product_url: str | None = None
+    is_active: bool | None = None
 
 
 class SnapshotCreate(BaseModel):
