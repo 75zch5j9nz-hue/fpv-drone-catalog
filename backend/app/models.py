@@ -55,6 +55,9 @@ class Drone(Base):
     fc_target: Mapped[str | None] = mapped_column(String(80), nullable=True)
     radio_link: Mapped[str | None] = mapped_column(String(80), nullable=True)
     video_system: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    # Appearance / classification
+    image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(80), nullable=True)
     # EASA / EU regulatory fields
     operator_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
     registration_country: Mapped[str | None] = mapped_column(String(10), nullable=True)

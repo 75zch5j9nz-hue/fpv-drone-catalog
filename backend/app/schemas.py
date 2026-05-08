@@ -20,6 +20,8 @@ class DroneExportOut(BaseModel):
     fc_target: str | None
     radio_link: str | None
     video_system: str | None
+    image_url: str | None
+    category: str | None
     operator_id: str | None
     registration_country: str | None
     registration_expiry: str | None
@@ -43,6 +45,9 @@ class DroneCreate(BaseModel):
     fc_target: str | None = None
     radio_link: str | None = None
     video_system: str | None = None
+    # Appearance / classification
+    image_url: str | None = None
+    category: str | None = None
     # EASA regulatory
     operator_id: str | None = None
     registration_country: str | None = None
@@ -62,6 +67,8 @@ class DroneUpdate(BaseModel):
     fc_target: str | None = None
     radio_link: str | None = None
     video_system: str | None = None
+    image_url: str | None = None
+    category: str | None = None
     operator_id: str | None = None
     registration_country: str | None = None
     registration_expiry: str | None = None
@@ -187,6 +194,8 @@ class DroneOut(BaseModel):
     fc_target: str | None
     radio_link: str | None
     video_system: str | None
+    image_url: str | None
+    category: str | None
     operator_id: str | None
     registration_country: str | None
     registration_expiry: str | None

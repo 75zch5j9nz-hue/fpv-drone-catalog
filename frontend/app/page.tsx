@@ -51,6 +51,8 @@ type Drone = {
   fc_target: string | null;
   radio_link: string | null;
   video_system: string | null;
+  image_url: string | null;
+  category: string | null;
   operator_id: string | null;
   registration_country: string | null;
   registration_expiry: string | null;
@@ -107,44 +109,81 @@ type DroneTemplate = {
   auw_grams: number | null;
   category: string;
   notes: string | null;
+  image_url: string | null;
+  product_url: string | null;
 };
 
 const DRONE_TEMPLATES: DroneTemplate[] = [
-  { brand:'iFlight', model:'Nazgul Evoque F5 V2', frame:'5"', frame_name:'Nazgul Evoque F5 V2', stack:'BLITZ Mini F7 + E55S 55A', motors:'XING2 2207 1750KV', props:'5.1"', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:315, category:'freestyle', notes:'Squashed-X. 4S/6S. Caddx Ratel2 camera.' },
-  { brand:'iFlight', model:'Nazgul Evoque F5D V2', frame:'5"', frame_name:'Nazgul Evoque F5D V2', stack:'BLITZ Mini F722 + 55A ESC', motors:'XING2 2207 1750KV 6S', props:'5.1"', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F722', auw_grams:385, category:'freestyle / cinematic', notes:'DeadCat geometry. GPS optional. 4S/6S.' },
-  { brand:'iFlight', model:'Nazgul Evoque F5 V3', frame:'5"', frame_name:'Nazgul Evoque F5 V3', stack:'BLITZ Mini F7 + 60A ESC', motors:'XING2 2207 1750KV 6S', props:'5.1"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:420, category:'freestyle', notes:'DC or X geometry. GPS version available. 2025 flagship.' },
-  { brand:'iFlight', model:'Nazgul XL5 ECO O4', frame:'5"', frame_name:'Nazgul XL5 ECO', stack:'BLITZ F7 + 55A ESC', motors:'XING 2207 1800KV', props:'5.1"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F722', auw_grams:398, category:'freestyle', notes:'Budget 5-inch with O4-ready layout and serviceable arms.' },
-  { brand:'iFlight', model:'Chimera7 Pro V2 O4', frame:'7"', frame_name:'Chimera7 Pro V2', stack:'BLITZ F7 + 55A ESC', motors:'XING2 2809 1250KV', props:'7"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:690, category:'long-range', notes:'Long-range 7-inch platform with GPS and high-efficiency tune profile.' },
-  { brand:'iFlight', model:'Chimera5 Pro V2 O4', frame:'5"', frame_name:'Chimera5 Pro V2', stack:'BLITZ F7 + 55A ESC', motors:'XING2 2207 1750KV', props:'5.1"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:458, category:'long-range / freestyle', notes:'Long-range oriented 5-inch with GPS and deadcat visibility.' },
-  { brand:'iFlight', model:'Protek35 O4', frame:'3.5"', frame_name:'Protek35', stack:'BLITZ F722 + 45A AIO', motors:'2205.5 2150KV', props:'3.5"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F722', auw_grams:286, category:'cinematic', notes:'3.5-inch ducted cinewhoop for proximity and indoor/outdoor cinematic work.' },
-  { brand:'iFlight', model:'Mach R5 Sport', frame:'5"', frame_name:'Mach R5', stack:'BLITZ F7 + 55A ESC', motors:'XING2 2207 2400KV 6S', props:'5.1"', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:335, category:'racing', notes:'True-X racing frame. High-KV motors. 6S.' },
-  { brand:'iFlight', model:'Defender 20 Lite O4', frame:'2"', frame_name:'Defender 20', stack:'BLITZ F411 AIO + 20A', motors:'1103 14000KV', props:'2"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F411RX', auw_grams:88, category:'cinematic / indoor', notes:'2-inch ducted cinewhoop. 2S.' },
-  { brand:'GEPRC', model:'Mark5 Analog', frame:'5"', frame_name:'GEP-MK5 225mm', stack:'GEPRC F7 + 50A BL_32 ESC', motors:'SPEEDX2 2107.5 1960KV', props:'5"', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722', auw_grams:365, category:'freestyle', notes:'225mm True-X. HD (O3) and DC O4 Pro variants also available.' },
-  { brand:'GEPRC', model:'Mark5 DC O4 Pro', frame:'5"', frame_name:'GEP-MK5 DC 230mm', stack:'TAKER F7 + 50A ESC', motors:'SPEEDX2 2107.5 1960KV', props:'5"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722_BT_HD', auw_grams:395, category:'freestyle / cinematic', notes:'DeadCat GPS. 230mm wheelbase. 2025 release.' },
-  { brand:'GEPRC', model:'Mark4 HD O4 Pro', frame:'4"', frame_name:'GEP-MK4', stack:'TAKER F722 + 45A ESC', motors:'SPEEDX2 2004 2850KV', props:'4"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722_BT_HD', auw_grams:258, category:'freestyle / compact', notes:'Compact 4-inch build balancing agility and cleaner footage.' },
-  { brand:'GEPRC', model:'CineLog30 V3 O4', frame:'3"', frame_name:'CineLog30 V3', stack:'TAKER F411 + 35A AIO', motors:'1404 3850KV', props:'3"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF405_BT_HD', auw_grams:168, category:'cinematic', notes:'3-inch ducted platform between CL25 and CL35 for mixed indoor/outdoor work.' },
-  { brand:'GEPRC', model:'CineLog20 O4', frame:'2"', frame_name:'CineLog20', stack:'TAKER F411 20A AIO', motors:'1202.5 6500KV', props:'2"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF405_BT_HD', auw_grams:112, category:'cinematic / indoor', notes:'Compact 2-inch cinewhoop focused on tight spaces and low-noise flights.' },
-  { brand:'GEPRC', model:'SMART 35 HD', frame:'3.5"', frame_name:'SMART 35', stack:'GEPRC F722 + 45A ESC', motors:'2105.5 2650KV', props:'3.5"', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722', auw_grams:232, category:'freestyle / cinematic', notes:'Unducted 3.5-inch with HD payload capacity and robust frame.' },
-  { brand:'GEPRC', model:'Cinebot30 HD O3', frame:'3"', frame_name:'Cinebot30 127mm', stack:'GEPRC F7 45A AIO V2', motors:'SPEEDX2 1804 2450KV', props:'3"', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF745_BT_HD', auw_grams:195, category:'cinematic', notes:'127mm cinewhoop. 4S/6S.' },
-  { brand:'GEPRC', model:'CineLog35 V3 O4 Pro', frame:'3.5"', frame_name:'GEP-CL35 V3 142mm', stack:'TAKER F7 + 45A AIO', motors:'SPEEDX2 2105.5 2650KV', props:'3.5"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722_BT_HD', auw_grams:215, category:'cinematic', notes:'142mm ducted. GPS. 6S.' },
-  { brand:'GEPRC', model:'Tern LR40', frame:'4"', frame_name:'Tern LR40', stack:'TAKER G4 45A AIO', motors:'SPEEDX2 1404 3000KV', props:'4"', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF405_BT_HD', auw_grams:155, category:'long-range', notes:'Sub-250g 4-inch long range. 4S.' },
-  { brand:'Flywoo', model:'Explorer LR 4 O4', frame:'4"', frame_name:'Explorer LR 4', stack:'GOKU F405 AIO + 20A ESC', motors:'ROBO 2004 1700KV', props:'4"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:242, category:'long-range', notes:'Sub-250g. 3S. GPS PRO variant also available.' },
-  { brand:'Flywoo', model:'Explorer LR 4 PRO O4', frame:'4"', frame_name:'Explorer LR 4 PRO', stack:'GOKU F405 HD + 20A ESC', motors:'ROBO 2004 1700KV', props:'4"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:248, category:'long-range', notes:'Pro variant with stronger camera protection and GPS-first long-range layout.' },
-  { brand:'Flywoo', model:'Explorer LR 4 Nano', frame:'4"', frame_name:'Explorer LR 4 Nano', stack:'GOKU F405 Nano + 16A ESC', motors:'1404 2750KV', props:'4"', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:182, category:'long-range / ultralight', notes:'Ultralight analog LR platform for efficient cruising.' },
-  { brand:'Flywoo', model:'Firefly 20 PRO O4 Wide', frame:'2"', frame_name:'Firefly 20 PRO', stack:'GOKU F405 AIO + 20A', motors:'1404 3800KV', props:'2"', video_system:'DJI O4 Wide', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:78, category:'cinematic / micro', notes:'2-inch micro O4 wide-angle. 4S.' },
-  { brand:'Flywoo', model:'Firefly 25 Nano Baby O4', frame:'2.5"', frame_name:'Firefly 25 Nano Baby', stack:'GOKU F405 20A AIO', motors:'1404 4600KV', props:'2.5"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:118, category:'micro / freestyle', notes:'2.5-inch lightweight build tuned for tight freestyle and quick recovery.' },
-  { brand:'Flywoo', model:'Firefly 16 Nano Baby V3 O4', frame:'1.6"', frame_name:'Firefly 16 Nano Baby V3', stack:'GOKU F411 5-in-1 + 12A', motors:'1102 8700KV', props:'1.6"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF411_AIO', auw_grams:38, category:'nano / micro cinematic', notes:'1S nano with upgraded V3 frame and stronger camera cage.' },
-  { brand:'Flywoo', model:'FlyLens 75 HD O4', frame:'1.6"', frame_name:'FlyLens 75', stack:'GOKU F411 12A AIO', motors:'1002 22000KV', props:'1.6"', video_system:'DJI O4 Lite', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF411_AIO', auw_grams:46, category:'indoor whoop', notes:'75mm micro whoop for indoor cinematic lines and low acoustic footprint.' },
-  { brand:'Flywoo', model:'FlyLens 85 HD O4', frame:'2"', frame_name:'FlyLens 85', stack:'GOKU F405 AIO + 20A', motors:'1202.5 12000KV', props:'2"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:52, category:'cinematic / indoor whoop', notes:'85mm ducted whoop. 2S.' },
-  { brand:'Flywoo', model:'Vampire 5 HD O3', frame:'5"', frame_name:'Vampire 5', stack:'GOKU F745 AIO + 45A', motors:'ROBO 2207 1750KV', props:'5.1"', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF745AIO', auw_grams:375, category:'freestyle', notes:'5-inch freestyle. 6S.' },
-  { brand:'DeepSpaceFPV', model:'SEEKER5 O4 Pro', frame:'5"', frame_name:'SEEKER5 DC/XL 215mm', stack:'HAKRC F722 V2 + 60A ESC', motors:'Aether 2207.3 1960KV', props:'5.1" Gemfan 51433', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722', auw_grams:382, category:'freestyle', notes:'5-inch DC/XL freestyle with GPS. Also O3 and Analog PNP variants. 6S.' },
-  { brand:'DeepSpaceFPV', model:'SEEKER5 O3', frame:'5"', frame_name:'SEEKER5 DC/XL 215mm', stack:'HAKRC F722 V2 + 60A ESC', motors:'Aether 2207.3 1960KV', props:'5.1" Gemfan 51433', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722', auw_grams:375, category:'freestyle', notes:'5-inch DC/XL freestyle with GPS. O3 Air Unit variant. 6S.' },
-  { brand:'DeepSpaceFPV', model:'SEEKER35 O4 Pro', frame:'3.5"', frame_name:'SEEKER35 DC/XL', stack:'TALOS F722AIO BL32-40A', motors:'Aether 2006 2550KV', props:'3.5" HQ DT90mm', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722MINI', auw_grams:228, category:'freestyle', notes:'3.5-inch DC/XL freestyle, GPS, 6S. Also Analog PNP variant.' },
-  { brand:'DeepSpaceFPV', model:'SEEKER3 O4 Pro', frame:'3"', frame_name:'SEEKER3 DC/XL', stack:'HAKRC F722 mini V2 + 40A ESC', motors:'Aether 1505 4000KV', props:'3" HQProp T3x3x3', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722MINI', auw_grams:165, category:'freestyle', notes:'Sub-250g 3-inch freestyle with GPS. 4S. DC/XL geometry.' },
-  { brand:'DeepSpaceFPV', model:'SEEKER3 Analog', frame:'3"', frame_name:'SEEKER3 DC/XL', stack:'HAKRC F722 mini V2 + 40A ESC', motors:'Aether 1505 4000KV', props:'3" HQProp T3x3x3', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722MINI', auw_grams:148, category:'freestyle', notes:'Sub-250g 3-inch analog freestyle. GPS. 4S.' },
-  { brand:'DeepSpaceFPV', model:'Stellar 25 O4 Pro', frame:'2.5"', frame_name:'Stellar 25', stack:'TALOS F722AIO BL32-40A', motors:'Aether 1404 4600KV', props:'2.5" Gemfan D63', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722MINI', auw_grams:122, category:'cinematic / micro', notes:'2.5-inch micro. GPS optional. O4 Pro (bring cam/VTX). 4S.' },
-  { brand:'DeepSpaceFPV', model:'ROC7 O4 Pro', frame:'7"', frame_name:'ROC7 322mm', stack:'HAKRC F722 V2 + 60A ESC', motors:'RED LINE 2807 1350KV', props:'7"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722', auw_grams:748, category:'long-range', notes:'7-inch long-range freestyle. T700 carbon fiber. GPS. 6S.' },
-  { brand:'DeepSpaceFPV', model:'ROC4 O4 Pro', frame:'4"', frame_name:'ROC4 DC-Type', stack:'TALOS F722AIO BL32-40A', motors:'Aether 1404 3000KV', props:'4"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722MINI', auw_grams:238, category:'long-range', notes:'4-inch DC-type long range with GPS. Sub-250g. 4S.' },
+  { brand:'iFlight', model:'Nazgul Evoque F5 V2', frame:'5"', frame_name:'Nazgul Evoque F5 V2', stack:'BLITZ Mini F7 + E55S 55A', motors:'XING2 2207 1750KV', props:'5.1"', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:315, category:'freestyle', notes:'Squashed-X. 4S/6S. Caddx Ratel2 camera.',
+    image_url:'https://cdn.shopify.com/s/files/1/0598/8083/4545/files/Nazgul-Evoque-F5-V2_main.jpg', product_url:'https://store.iflight.com/products/nazgul-evoque-f5-v2-freestyle-fpv-drone' },
+  { brand:'iFlight', model:'Nazgul Evoque F5D V2', frame:'5"', frame_name:'Nazgul Evoque F5D V2', stack:'BLITZ Mini F722 + 55A ESC', motors:'XING2 2207 1750KV 6S', props:'5.1"', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F722', auw_grams:385, category:'freestyle / cinematic', notes:'DeadCat geometry. GPS optional. 4S/6S.',
+    image_url:'https://cdn.shopify.com/s/files/1/0598/8083/4545/files/Nazgul-Evoque-F5D-V2_main.jpg', product_url:'https://store.iflight.com/products/nazgul-evoque-f5d-v2-fpv-drone' },
+  { brand:'iFlight', model:'Nazgul Evoque F5 V3', frame:'5"', frame_name:'Nazgul Evoque F5 V3', stack:'BLITZ Mini F7 + 60A ESC', motors:'XING2 2207 1750KV 6S', props:'5.1"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:420, category:'freestyle', notes:'DC or X geometry. GPS version available. 2025 flagship.',
+    image_url:'https://cdn.shopify.com/s/files/1/0598/8083/4545/files/Nazgul-Evoque-F5-V3_main.jpg', product_url:'https://store.iflight.com/products/nazgul-evoque-f5-v3-dc-o4-pro-fpv-drone' },
+  { brand:'iFlight', model:'Nazgul XL5 ECO O4', frame:'5"', frame_name:'Nazgul XL5 ECO', stack:'BLITZ F7 + 55A ESC', motors:'XING 2207 1800KV', props:'5.1"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F722', auw_grams:398, category:'freestyle', notes:'Budget 5-inch with O4-ready layout and serviceable arms.',
+    image_url:'https://cdn.shopify.com/s/files/1/0598/8083/4545/files/Nazgul-XL5_main.jpg', product_url:'https://store.iflight.com/products/nazgul-xl5-eco' },
+  { brand:'iFlight', model:'Chimera7 Pro V2 O4', frame:'7"', frame_name:'Chimera7 Pro V2', stack:'BLITZ F7 + 55A ESC', motors:'XING2 2809 1250KV', props:'7"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:690, category:'long-range', notes:'Long-range 7-inch platform with GPS and high-efficiency tune profile.',
+    image_url:'https://cdn.shopify.com/s/files/1/0598/8083/4545/files/Chimera7-Pro-V2_main.jpg', product_url:'https://store.iflight.com/products/chimera7-pro-v2-fpv-drone' },
+  { brand:'iFlight', model:'Chimera5 Pro V2 O4', frame:'5"', frame_name:'Chimera5 Pro V2', stack:'BLITZ F7 + 55A ESC', motors:'XING2 2207 1750KV', props:'5.1"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:458, category:'long-range / freestyle', notes:'Long-range oriented 5-inch with GPS and deadcat visibility.',
+    image_url:'https://cdn.shopify.com/s/files/1/0598/8083/4545/files/Chimera5-Pro-V2_main.jpg', product_url:'https://store.iflight.com/products/chimera5-pro-v2-fpv-drone' },
+  { brand:'iFlight', model:'Protek35 O4', frame:'3.5"', frame_name:'Protek35', stack:'BLITZ F722 + 45A AIO', motors:'2205.5 2150KV', props:'3.5"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F722', auw_grams:286, category:'cinematic', notes:'3.5-inch ducted cinewhoop for proximity and indoor/outdoor cinematic work.',
+    image_url:'https://cdn.shopify.com/s/files/1/0598/8083/4545/files/Protek35-O4_main.jpg', product_url:'https://store.iflight.com/products/protek35-o4-fpv-drone' },
+  { brand:'iFlight', model:'Mach R5 Sport', frame:'5"', frame_name:'Mach R5', stack:'BLITZ F7 + 55A ESC', motors:'XING2 2207 2400KV 6S', props:'5.1"', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:335, category:'racing', notes:'True-X racing frame. High-KV motors. 6S.',
+    image_url:'https://cdn.shopify.com/s/files/1/0598/8083/4545/files/Mach-R5_main.jpg', product_url:'https://store.iflight.com/products/mach-r5-fpv-racing-drone' },
+  { brand:'iFlight', model:'Defender 20 Lite O4', frame:'2"', frame_name:'Defender 20', stack:'BLITZ F411 AIO + 20A', motors:'1103 14000KV', props:'2"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F411RX', auw_grams:88, category:'cinematic / indoor', notes:'2-inch ducted cinewhoop. 2S.',
+    image_url:'https://cdn.shopify.com/s/files/1/0598/8083/4545/files/Defender20-Lite_main.jpg', product_url:'https://store.iflight.com/products/defender-20-lite-o4' },
+  { brand:'GEPRC', model:'Mark5 Analog', frame:'5"', frame_name:'GEP-MK5 225mm', stack:'GEPRC F7 + 50A BL_32 ESC', motors:'SPEEDX2 2107.5 1960KV', props:'5"', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722', auw_grams:365, category:'freestyle', notes:'225mm True-X. HD (O3) and DC O4 Pro variants also available.',
+    image_url:'https://geprc.com/wp-content/uploads/2022/06/GEPRC-MARK5-Analog-main.jpg', product_url:'https://geprc.com/product/geprc-mark5-analog-freestyle-fpv-drone/' },
+  { brand:'GEPRC', model:'Mark5 DC O4 Pro', frame:'5"', frame_name:'GEP-MK5 DC 230mm', stack:'TAKER F7 + 50A ESC', motors:'SPEEDX2 2107.5 1960KV', props:'5"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722_BT_HD', auw_grams:395, category:'freestyle / cinematic', notes:'DeadCat GPS. 230mm wheelbase. 2025 release.',
+    image_url:'https://geprc.com/wp-content/uploads/2024/10/GEPRC-MARK5-DC-O4-Pro-main.jpg', product_url:'https://geprc.com/product/geprc-mark5-dc-o4-pro-freestyle-fpv-drone/' },
+  { brand:'GEPRC', model:'Mark4 HD O4 Pro', frame:'4"', frame_name:'GEP-MK4', stack:'TAKER F722 + 45A ESC', motors:'SPEEDX2 2004 2850KV', props:'4"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722_BT_HD', auw_grams:258, category:'freestyle / compact', notes:'Compact 4-inch build balancing agility and cleaner footage.',
+    image_url:'https://geprc.com/wp-content/uploads/2024/09/GEPRC-MARK4-HD-O4-Pro-main.jpg', product_url:'https://geprc.com/product/geprc-mark4-hd-o4-pro-fpv-drone/' },
+  { brand:'GEPRC', model:'CineLog30 V3 O4', frame:'3"', frame_name:'CineLog30 V3', stack:'TAKER F411 + 35A AIO', motors:'1404 3850KV', props:'3"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF405_BT_HD', auw_grams:168, category:'cinematic', notes:'3-inch ducted platform between CL25 and CL35 for mixed indoor/outdoor work.',
+    image_url:'https://geprc.com/wp-content/uploads/2024/03/GEPRC-CineLog30-V3-O4-main.jpg', product_url:'https://geprc.com/product/geprc-cinelog30-v3-o4-cinewhoop-fpv-drone/' },
+  { brand:'GEPRC', model:'CineLog20 O4', frame:'2"', frame_name:'CineLog20', stack:'TAKER F411 20A AIO', motors:'1202.5 6500KV', props:'2"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF405_BT_HD', auw_grams:112, category:'cinematic / indoor', notes:'Compact 2-inch cinewhoop focused on tight spaces and low-noise flights.',
+    image_url:'https://geprc.com/wp-content/uploads/2024/04/GEPRC-CineLog20-O4-main.jpg', product_url:'https://geprc.com/product/geprc-cinelog20-o4-fpv-drone/' },
+  { brand:'GEPRC', model:'SMART 35 HD', frame:'3.5"', frame_name:'SMART 35', stack:'GEPRC F722 + 45A ESC', motors:'2105.5 2650KV', props:'3.5"', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722', auw_grams:232, category:'freestyle / cinematic', notes:'Unducted 3.5-inch with HD payload capacity and robust frame.',
+    image_url:'https://geprc.com/wp-content/uploads/2023/07/GEPRC-SMART35-HD-O3-main.jpg', product_url:'https://geprc.com/product/geprc-smart-35-hd-fpv-drone/' },
+  { brand:'GEPRC', model:'Cinebot30 HD O3', frame:'3"', frame_name:'Cinebot30 127mm', stack:'GEPRC F7 45A AIO V2', motors:'SPEEDX2 1804 2450KV', props:'3"', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF745_BT_HD', auw_grams:195, category:'cinematic', notes:'127mm cinewhoop. 4S/6S.',
+    image_url:'https://geprc.com/wp-content/uploads/2022/11/GEPRC-Cinebot30-HD-O3-main.jpg', product_url:'https://geprc.com/product/geprc-cinebot30-hd-o3-fpv-drone/' },
+  { brand:'GEPRC', model:'CineLog35 V3 O4 Pro', frame:'3.5"', frame_name:'GEP-CL35 V3 142mm', stack:'TAKER F7 + 45A AIO', motors:'SPEEDX2 2105.5 2650KV', props:'3.5"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722_BT_HD', auw_grams:215, category:'cinematic', notes:'142mm ducted. GPS. 6S.',
+    image_url:'https://geprc.com/wp-content/uploads/2024/06/GEPRC-CineLog35-V3-O4-Pro-main.jpg', product_url:'https://geprc.com/product/geprc-cinelog35-v3-o4-pro-fpv-drone/' },
+  { brand:'GEPRC', model:'Tern LR40', frame:'4"', frame_name:'Tern LR40', stack:'TAKER G4 45A AIO', motors:'SPEEDX2 1404 3000KV', props:'4"', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF405_BT_HD', auw_grams:155, category:'long-range', notes:'Sub-250g 4-inch long range. 4S.',
+    image_url:'https://geprc.com/wp-content/uploads/2023/01/GEPRC-Tern-LR40-main.jpg', product_url:'https://geprc.com/product/geprc-tern-lr40-fpv-drone/' },
+  { brand:'Flywoo', model:'Explorer LR 4 O4', frame:'4"', frame_name:'Explorer LR 4', stack:'GOKU F405 AIO + 20A ESC', motors:'ROBO 2004 1700KV', props:'4"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:242, category:'long-range', notes:'Sub-250g. 3S. GPS PRO variant also available.',
+    image_url:'https://flywoo.net/cdn/shop/files/Explorer-LR4-O4-main.jpg', product_url:'https://flywoo.net/products/explorer-lr-4-o4' },
+  { brand:'Flywoo', model:'Explorer LR 4 PRO O4', frame:'4"', frame_name:'Explorer LR 4 PRO', stack:'GOKU F405 HD + 20A ESC', motors:'ROBO 2004 1700KV', props:'4"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:248, category:'long-range', notes:'Pro variant with stronger camera protection and GPS-first long-range layout.',
+    image_url:'https://flywoo.net/cdn/shop/files/Explorer-LR4-PRO-O4-main.jpg', product_url:'https://flywoo.net/products/explorer-lr-4-pro-o4' },
+  { brand:'Flywoo', model:'Explorer LR 4 Nano', frame:'4"', frame_name:'Explorer LR 4 Nano', stack:'GOKU F405 Nano + 16A ESC', motors:'1404 2750KV', props:'4"', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:182, category:'long-range / ultralight', notes:'Ultralight analog LR platform for efficient cruising.',
+    image_url:'https://flywoo.net/cdn/shop/files/Explorer-LR4-Nano-main.jpg', product_url:'https://flywoo.net/products/explorer-lr-4-nano' },
+  { brand:'Flywoo', model:'Firefly 20 PRO O4 Wide', frame:'2"', frame_name:'Firefly 20 PRO', stack:'GOKU F405 AIO + 20A', motors:'1404 3800KV', props:'2"', video_system:'DJI O4 Wide', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:78, category:'cinematic / micro', notes:'2-inch micro O4 wide-angle. 4S.',
+    image_url:'https://flywoo.net/cdn/shop/files/Firefly20PRO-O4Wide-main.jpg', product_url:'https://flywoo.net/products/firefly-20pro-4s-25mini-3s-o4-wide-micro-drone' },
+  { brand:'Flywoo', model:'Firefly 25 Nano Baby O4', frame:'2.5"', frame_name:'Firefly 25 Nano Baby', stack:'GOKU F405 20A AIO', motors:'1404 4600KV', props:'2.5"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:118, category:'micro / freestyle', notes:'2.5-inch lightweight build tuned for tight freestyle and quick recovery.',
+    image_url:'https://flywoo.net/cdn/shop/files/Firefly25-Nano-main.jpg', product_url:'https://flywoo.net/products/firefly-25-nano-baby-o4' },
+  { brand:'Flywoo', model:'Firefly 16 Nano Baby V3 O4', frame:'1.6"', frame_name:'Firefly 16 Nano Baby V3', stack:'GOKU F411 5-in-1 + 12A', motors:'1102 8700KV', props:'1.6"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF411_AIO', auw_grams:38, category:'nano / micro cinematic', notes:'1S nano with upgraded V3 frame and stronger camera cage.',
+    image_url:'https://flywoo.net/cdn/shop/files/Firefly16-Nano-V3-main.jpg', product_url:'https://flywoo.net/products/firefly-16-nano-baby-v3-o4' },
+  { brand:'Flywoo', model:'FlyLens 75 HD O4', frame:'1.6"', frame_name:'FlyLens 75', stack:'GOKU F411 12A AIO', motors:'1002 22000KV', props:'1.6"', video_system:'DJI O4 Lite', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF411_AIO', auw_grams:46, category:'indoor whoop', notes:'75mm micro whoop for indoor cinematic lines and low acoustic footprint.',
+    image_url:'https://flywoo.net/cdn/shop/files/FlyLens75-HD-O4-main.jpg', product_url:'https://flywoo.net/products/flylens-75-hd-o4-pro-2s-whoop-fpv-drone-v1.3' },
+  { brand:'Flywoo', model:'FlyLens 85 HD O4', frame:'2"', frame_name:'FlyLens 85', stack:'GOKU F405 AIO + 20A', motors:'1202.5 12000KV', props:'2"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:52, category:'cinematic / indoor whoop', notes:'85mm ducted whoop. 2S.',
+    image_url:'https://flywoo.net/cdn/shop/files/FlyLens85-HD-O4-main.jpg', product_url:'https://flywoo.net/products/flylens-85-hd-o4-pro-2s-led-whoop-fpv-drone-v1.3' },
+  { brand:'Flywoo', model:'Vampire 5 HD O3', frame:'5"', frame_name:'Vampire 5', stack:'GOKU F745 AIO + 45A', motors:'ROBO 2207 1750KV', props:'5.1"', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF745AIO', auw_grams:375, category:'freestyle', notes:'5-inch freestyle. 6S.',
+    image_url:'https://flywoo.net/cdn/shop/files/Vampire5-HD-O3-main.jpg', product_url:'https://flywoo.net/products/vampire-5-hd-o3' },
+  { brand:'DeepSpaceFPV', model:'SEEKER5 O4 Pro', frame:'5"', frame_name:'SEEKER5 DC/XL 215mm', stack:'HAKRC F722 V2 + 60A ESC', motors:'Aether 2207.3 1960KV', props:'5.1" Gemfan 51433', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722', auw_grams:382, category:'freestyle', notes:'5-inch DC/XL freestyle with GPS. Also O3 and Analog PNP variants. 6S.',
+    image_url:'https://deepspacefpv.com/cdn/shop/files/SEEKER5-O4-Pro-main.jpg', product_url:'https://deepspacefpv.com/products/seeker5-o4-pro' },
+  { brand:'DeepSpaceFPV', model:'SEEKER5 O3', frame:'5"', frame_name:'SEEKER5 DC/XL 215mm', stack:'HAKRC F722 V2 + 60A ESC', motors:'Aether 2207.3 1960KV', props:'5.1" Gemfan 51433', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722', auw_grams:375, category:'freestyle', notes:'5-inch DC/XL freestyle with GPS. O3 Air Unit variant. 6S.',
+    image_url:'https://deepspacefpv.com/cdn/shop/files/SEEKER5-O3-main.jpg', product_url:'https://deepspacefpv.com/products/seeker5-o3' },
+  { brand:'DeepSpaceFPV', model:'SEEKER35 O4 Pro', frame:'3.5"', frame_name:'SEEKER35 DC/XL', stack:'TALOS F722AIO BL32-40A', motors:'Aether 2006 2550KV', props:'3.5" HQ DT90mm', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722MINI', auw_grams:228, category:'freestyle', notes:'3.5-inch DC/XL freestyle, GPS, 6S. Also Analog PNP variant.',
+    image_url:'https://deepspacefpv.com/cdn/shop/files/SEEKER35-O4-Pro-main.jpg', product_url:'https://deepspacefpv.com/products/seeker35-o4-pro' },
+  { brand:'DeepSpaceFPV', model:'SEEKER3 O4 Pro', frame:'3"', frame_name:'SEEKER3 DC/XL', stack:'HAKRC F722 mini V2 + 40A ESC', motors:'Aether 1505 4000KV', props:'3" HQProp T3x3x3', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722MINI', auw_grams:165, category:'freestyle', notes:'Sub-250g 3-inch freestyle with GPS. 4S. DC/XL geometry.',
+    image_url:'https://deepspacefpv.com/cdn/shop/files/SEEKER3-O4-Pro-main.jpg', product_url:'https://deepspacefpv.com/products/seeker3-o4-pro' },
+  { brand:'DeepSpaceFPV', model:'SEEKER3 Analog', frame:'3"', frame_name:'SEEKER3 DC/XL', stack:'HAKRC F722 mini V2 + 40A ESC', motors:'Aether 1505 4000KV', props:'3" HQProp T3x3x3', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722MINI', auw_grams:148, category:'freestyle', notes:'Sub-250g 3-inch analog freestyle. GPS. 4S.',
+    image_url:'https://deepspacefpv.com/cdn/shop/files/SEEKER3-Analog-main.jpg', product_url:'https://deepspacefpv.com/products/seeker3-analog' },
+  { brand:'DeepSpaceFPV', model:'Stellar 25 O4 Pro', frame:'2.5"', frame_name:'Stellar 25', stack:'TALOS F722AIO BL32-40A', motors:'Aether 1404 4600KV', props:'2.5" Gemfan D63', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722MINI', auw_grams:122, category:'cinematic / micro', notes:'2.5-inch micro. GPS optional. O4 Pro (bring cam/VTX). 4S.',
+    image_url:'https://deepspacefpv.com/cdn/shop/files/Stellar25-O4-Pro-main.jpg', product_url:'https://deepspacefpv.com/products/stellar-25-o4-pro' },
+  { brand:'DeepSpaceFPV', model:'ROC7 O4 Pro', frame:'7"', frame_name:'ROC7 322mm', stack:'HAKRC F722 V2 + 60A ESC', motors:'RED LINE 2807 1350KV', props:'7"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722', auw_grams:748, category:'long-range', notes:'7-inch long-range freestyle. T700 carbon fiber. GPS. 6S.',
+    image_url:'https://deepspacefpv.com/cdn/shop/files/ROC7-O4-Pro-main.jpg', product_url:'https://deepspacefpv.com/products/roc7-o4-pro' },
+  { brand:'DeepSpaceFPV', model:'ROC4 O4 Pro', frame:'4"', frame_name:'ROC4 DC-Type', stack:'TALOS F722AIO BL32-40A', motors:'Aether 1404 3000KV', props:'4"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722MINI', auw_grams:238, category:'long-range', notes:'4-inch DC-type long range with GPS. Sub-250g. 4S.',
+    image_url:'https://deepspacefpv.com/cdn/shop/files/ROC4-O4-Pro-main.jpg', product_url:'https://deepspacefpv.com/products/roc4-o4-pro' },
 ];
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
@@ -278,6 +317,8 @@ export default function HomePage() {
           fc_target: formData.get('fc_target') || null,
           radio_link: formData.get('radio_link') || null,
           video_system: formData.get('video_system') || null,
+          image_url: formData.get('image_url') || null,
+          category: formData.get('category') || null,
           operator_id: formData.get('operator_id') || null,
           registration_country: formData.get('registration_country') || null,
           registration_expiry: formData.get('registration_expiry') || null,
@@ -504,6 +545,8 @@ export default function HomePage() {
       (document.querySelector<HTMLInputElement>('form input[name="props"]') || {} as HTMLInputElement).value = template.props || '';
       (document.querySelector<HTMLInputElement>('form input[name="fc_target"]') || {} as HTMLInputElement).value = template.fc_target || '';
       (document.querySelector<HTMLInputElement>('form input[name="auw_grams"]') || {} as HTMLInputElement).value = template.auw_grams ? String(template.auw_grams) : '';
+      (document.querySelector<HTMLInputElement>('form input[name="image_url"]') || {} as HTMLInputElement).value = template.image_url || '';
+      (document.querySelector<HTMLInputElement>('form input[name="category"]') || {} as HTMLInputElement).value = template.category || '';
       (document.querySelector<HTMLTextAreaElement>('form textarea[name="notes"]') || {} as HTMLTextAreaElement).value = template.notes || '';
       const radioSelect = document.querySelector<HTMLSelectElement>('form select[name="radio_link"]');
       if (radioSelect && template.radio_link) radioSelect.value = template.radio_link;
@@ -547,6 +590,8 @@ export default function HomePage() {
           fc_target: formData.get('fc_target') || null,
           radio_link: formData.get('radio_link') || null,
           video_system: formData.get('video_system') || null,
+          image_url: formData.get('image_url') || null,
+          category: formData.get('category') || null,
           operator_id: formData.get('operator_id') || null,
           registration_country: formData.get('registration_country') || null,
           registration_expiry: formData.get('registration_expiry') || null,
@@ -742,6 +787,16 @@ export default function HomePage() {
                 </label>
               </div>
             </details>
+            <div className="two-col">
+              <label className="field">
+                <span>Category</span>
+                <input name="category" placeholder="freestyle / cinematic / long-range" />
+              </label>
+              <label className="field">
+                <span>Image URL (manufacturer photo)</span>
+                <input name="image_url" type="url" placeholder="https://…" />
+              </label>
+            </div>
             <label className="field">
               <span>Notes</span>
               <textarea name="notes" placeholder="Build notes, receiver details, wiring changes..." />
@@ -846,23 +901,88 @@ export default function HomePage() {
                   }
                 }}
               >
-                <div className="meta">
-                  <strong>{drone.name}</strong>
-                  <span>{drone.frame || 'Frame not set'}</span>
-                  <span>{drone.stack || 'Stack not set'}</span>
-                </div>
-                <div className="badge-row" style={{marginBottom:'4px'}}>
-                  <span className="badge" style={{background:sm.bg,color:sm.color}}>{sm.label}</span>
-                  {drone.auw_grams ? <span className="badge">{drone.auw_grams}g</span> : null}
-                  {drone.video_system ? <span className="badge">{drone.video_system}</span> : null}
-                  {drone.radio_link ? <span className="badge">{drone.radio_link}</span> : null}
-                </div>
-                <p style={{margin:'4px 0 8px',fontSize:'0.88rem'}}>{drone.notes || 'No drone notes.'}</p>
-                <div className="badge-row" style={{justifyContent:'space-between'}}>
-                  <div className="badge-row">
-                    <span className="badge">Snapshots: {drone.snapshots.length}</span>
-                    <span className="badge">Flights: {drone.flight_notes.length}</span>
+                {/* ── Compact header (always visible) ── */}
+                <div style={{display:'flex',gap:'12px',alignItems:'flex-start'}}>
+                  {/* Thumbnail */}
+                  <div style={{flexShrink:0,width:'72px',height:'54px',borderRadius:'6px',overflow:'hidden',
+                    background:'linear-gradient(135deg,var(--surface2) 0%,rgba(255,255,255,0.04) 100%)',
+                    display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid var(--border)'}}>
+                    {drone.image_url
+                      ? <img src={drone.image_url} alt={drone.name} style={{width:'100%',height:'100%',objectFit:'cover'}}
+                          onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}}/>
+                      : <span style={{fontSize:'1.3rem',opacity:0.3}}>🚁</span>}
                   </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="meta">
+                      <strong>{drone.name}</strong>
+                      {drone.category && <span style={{fontSize:'0.72rem',color:'var(--accent)',textTransform:'uppercase',letterSpacing:'0.06em'}}>{drone.category}</span>}
+                      <span>{drone.frame || 'Frame not set'}</span>
+                    </div>
+                    <div className="badge-row" style={{marginTop:'4px'}}>
+                      <span className="badge" style={{background:sm.bg,color:sm.color}}>{sm.label}</span>
+                      {drone.auw_grams ? <span className="badge">{drone.auw_grams}g</span> : null}
+                      {drone.video_system ? <span className="badge">{drone.video_system}</span> : null}
+                      {drone.radio_link ? <span className="badge">{drone.radio_link}</span> : null}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Full spec card (expanded when selected) ── */}
+                {drone.id === selectedDroneId && (
+                  <div style={{marginTop:'14px',paddingTop:'14px',borderTop:'1px solid var(--border)'}} onClick={e=>e.stopPropagation()}>
+                    <div style={{display:'flex',gap:'16px',alignItems:'flex-start'}}>
+                      {/* Manufacturer photo */}
+                      <div style={{flexShrink:0,width:'200px'}}>
+                        {drone.image_url
+                          ? <img src={drone.image_url} alt={drone.name}
+                              style={{width:'200px',height:'150px',objectFit:'cover',borderRadius:'8px',border:'1px solid var(--border)',display:'block'}}
+                              onError={(e)=>{(e.target as HTMLImageElement).parentElement!.innerHTML='<div style="width:200px;height:150px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:3rem;opacity:0.3">🚁</div>';}}/>
+                          : <div style={{width:'200px',height:'150px',borderRadius:'8px',border:'1px solid var(--border)',
+                              background:'var(--surface2)',display:'flex',flexDirection:'column',alignItems:'center',
+                              justifyContent:'center',gap:'6px',color:'var(--text-muted)'}}>
+                              <span style={{fontSize:'2.5rem',opacity:0.3}}>🚁</span>
+                              <span style={{fontSize:'0.72rem'}}>No image</span>
+                            </div>}
+                      </div>
+                      {/* Spec table */}
+                      <div style={{flex:1,minWidth:0}}>
+                        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.82rem'}}>
+                          <tbody>
+                            {[
+                              ['Frame',       drone.frame],
+                              ['Stack',       drone.stack],
+                              ['Motors',      drone.motors],
+                              ['Props',       drone.props],
+                              ['Video',       drone.video_system],
+                              ['Radio',       drone.radio_link],
+                              ['FC target',   drone.fc_target],
+                              ['AUW',         drone.auw_grams ? `${drone.auw_grams} g` : null],
+                              ['Category',    drone.category],
+                            ].filter(([,v]) => v).map(([label, value]) => (
+                              <tr key={label as string} style={{borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                                <td style={{padding:'4px 10px 4px 0',color:'var(--text-muted)',whiteSpace:'nowrap',width:'80px'}}>{label}</td>
+                                <td style={{padding:'4px 0',color:'var(--text)',fontWeight:500}}>{value}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {drone.notes && <p style={{margin:'8px 0 0',fontSize:'0.81rem',color:'var(--text-muted)',lineHeight:1.5}}>{drone.notes}</p>}
+                      </div>
+                    </div>
+                    <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'10px',paddingTop:'8px',borderTop:'1px solid var(--border)'}}>
+                      <span className="badge">Snapshots: {drone.snapshots.length}</span>
+                      <span className="badge">Flights: {drone.flight_notes.length}</span>
+                      <span className="badge">Maintenance: {drone.maintenance_events.length}</span>
+                    </div>
+                  </div>
+                )}
+                <div className="badge-row" style={{justifyContent:'space-between',marginTop:'10px'}}>
+                  {drone.id !== selectedDroneId && (
+                    <div className="badge-row">
+                      <span className="badge">Snapshots: {drone.snapshots.length}</span>
+                      <span className="badge">Flights: {drone.flight_notes.length}</span>
+                    </div>
+                  )}
                   <div className="actions" onClick={(e) => e.stopPropagation()}>
                     <select style={{fontSize:'0.78rem',padding:'3px 6px',background:'var(--bg)',color:'var(--text)',border:'1px solid var(--border)',borderRadius:'4px',cursor:'pointer'}} value={drone.status} onChange={(e) => void handleQuickStatus(drone, e.target.value as DroneStatus)}>
                       {Object.entries(STATUS_META).map(([key, meta]) => (
@@ -964,6 +1084,16 @@ export default function HomePage() {
                       <label className="field">
                         <span>Remote ID module</span>
                         <input name="remote_id_module" defaultValue={drone.remote_id_module ?? ''} placeholder="Dronetag Mini" />
+                      </label>
+                    </div>
+                    <div className="two-col">
+                      <label className="field">
+                        <span>Category</span>
+                        <input name="category" defaultValue={drone.category ?? ''} placeholder="freestyle / cinematic / long-range" />
+                      </label>
+                      <label className="field">
+                        <span>Image URL (manufacturer photo)</span>
+                        <input name="image_url" type="url" defaultValue={drone.image_url ?? ''} placeholder="https://…" />
                       </label>
                     </div>
                     <label className="field">
