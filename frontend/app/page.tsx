@@ -946,6 +946,60 @@ export default function HomePage() {
                 <button className="button" type="submit">Next: Hardware →</button>
                 <button className="button ghost" type="button" onClick={() => setShowTemplates(!showTemplates)}>From template</button>
               </div>
+              {showTemplates && (
+                <div className="edit-panel" style={{marginTop:'10px'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+                    <h4 style={{margin:0,fontSize:'0.9rem'}}>Quick-fill from brand template</h4>
+                    <button className="button ghost" type="button" style={{fontSize:'0.75rem',padding:'2px 8px'}}
+                      onClick={() => { setShowTemplates(false); setTemplateBrand(''); setTemplateSearch(''); }}>✕ Close</button>
+                  </div>
+                  <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'8px'}}>
+                    {['', 'iFlight', 'GEPRC', 'Flywoo', 'DeepSpaceFPV'].map(b => (
+                      <button key={b || 'all'} type="button"
+                        className={`button ghost${templateBrand === b ? ' active' : ''}`}
+                        style={{fontSize:'0.75rem',padding:'3px 10px'}}
+                        onClick={() => setTemplateBrand(b)}>
+                        {b || 'All brands'}
+                      </button>
+                    ))}
+                  </div>
+                  <input type="text" placeholder="Search model…" value={templateSearch}
+                    onChange={e => setTemplateSearch(e.target.value)}
+                    style={{width:'100%',marginBottom:'10px',padding:'5px 9px',borderRadius:'6px',
+                      border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',
+                      fontSize:'0.82rem',boxSizing:'border-box'}} />
+                  {(() => {
+                    const filtered = DRONE_TEMPLATES.filter(t =>
+                      (!templateBrand || t.brand === templateBrand) &&
+                      (!templateSearch || t.model.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                        t.category.toLowerCase().includes(templateSearch.toLowerCase()))
+                    );
+                    return (
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px',maxHeight:'340px',overflowY:'auto',paddingRight:'2px'}}>
+                        {filtered.map(tpl => (
+                          <button key={`${tpl.brand}-${tpl.model}`} type="button" onClick={() => applyTemplate(tpl)}
+                            style={{textAlign:'left',padding:'9px 11px',borderRadius:'8px',
+                              border:'1px solid var(--border)',background:'var(--surface2)',
+                              cursor:'pointer',display:'flex',flexDirection:'column',gap:'3px'}}>
+                            <div style={{fontSize:'0.68rem',color:'var(--accent)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>{tpl.brand}</div>
+                            <div style={{fontSize:'0.84rem',fontWeight:600,color:'var(--text)',lineHeight:1.25}}>{tpl.model}</div>
+                            <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginTop:'2px'}}>
+                              <span style={{fontSize:'0.67rem',padding:'1px 5px',borderRadius:'4px',background:'rgba(255,255,255,0.07)',color:'var(--text-muted)'}}>{tpl.frame}</span>
+                              {tpl.auw_grams && <span style={{fontSize:'0.67rem',padding:'1px 5px',borderRadius:'4px',background:'rgba(255,255,255,0.07)',color:'var(--text-muted)'}}>{tpl.auw_grams}g</span>}
+                              {tpl.video_system && <span style={{fontSize:'0.67rem',padding:'1px 5px',borderRadius:'4px',background:'rgba(96,160,240,0.13)',color:'#60a0f0'}}>{tpl.video_system}</span>}
+                            </div>
+                          </button>
+                        ))}
+                        {filtered.length === 0 && (
+                          <div style={{gridColumn:'1/-1',textAlign:'center',color:'var(--text-muted)',padding:'24px',fontSize:'0.85rem'}}>
+                            No templates match.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </form>
           )}
 
@@ -968,6 +1022,10 @@ export default function HomePage() {
               </div>
               {!catLoaded ? (
                 <div style={{color:'var(--text-muted)',fontSize:'0.85rem',padding:'16px 0'}}>Loading catalogue…</div>
+              ) : catalogue.length === 0 ? (
+                <div style={{color:'var(--text-muted)',fontSize:'0.85rem',padding:'8px 0'}}>
+                  No products in catalogue yet. Use the custom part form below, or add products via API first.
+                </div>
               ) : (
                 <div style={{maxHeight:240,overflowY:'auto',border:'1px solid var(--border)',borderRadius:'8px',padding:'6px'}}>
                   {catalogue
@@ -981,13 +1039,98 @@ export default function HomePage() {
                     ))}
                 </div>
               )}
+              {selectedCatProduct && (
+                <div style={{border:'1px solid var(--accent)',borderRadius:'8px',padding:'10px',background:'rgba(96,160,240,0.05)'}}>
+                  <div style={{fontWeight:600,fontSize:'0.88rem',marginBottom:'6px'}}>{selectedCatProduct.name}</div>
+                  {selectedCatProduct.variants.length > 0 && (
+                    <div style={{marginBottom:'8px'}}>
+                      <div style={{fontSize:'0.75rem',color:'var(--text-muted)',marginBottom:'4px'}}>Variant:</div>
+                      <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
+                        {selectedCatProduct.variants.map(v => (
+                          <button key={v.id} type="button"
+                            className={`button ghost${selectedVariantId === v.id ? ' active' : ''}`}
+                            style={{fontSize:'0.73rem',padding:'2px 8px'}}
+                            onClick={() => setSelectedVariantId(v.id)}>
+                            {v.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{display:'flex',gap:'6px',alignItems:'center',flexWrap:'wrap'}}>
+                    <label style={{fontSize:'0.75rem',color:'var(--text-muted)'}}>Role:</label>
+                    <select value={addingRole ?? selectedCatProduct.component_role}
+                      onChange={e => setAddingRole(e.target.value as ComponentRole)}
+                      style={{padding:'3px 6px',borderRadius:'5px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.78rem'}}>
+                      {ALL_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                    </select>
+                    <label style={{fontSize:'0.75rem',color:'var(--text-muted)'}}>Qty:</label>
+                    <input type="number" min={1} max={20} id="cat-qty-input"
+                      defaultValue={ROLE_DEFAULT_QTY[addingRole ?? selectedCatProduct.component_role as ComponentRole] ?? 1}
+                      style={{width:48,padding:'3px 5px',borderRadius:'5px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.78rem'}} />
+                    <button className="button" type="button" style={{fontSize:'0.78rem',padding:'4px 12px'}}
+                      onClick={() => {
+                        const qtyEl = document.getElementById('cat-qty-input') as HTMLInputElement;
+                        const qty = parseInt(qtyEl?.value || '1', 10);
+                        addPendingComponent(selectedCatProduct, selectedVariantId, addingRole ?? selectedCatProduct.component_role as ComponentRole, qty);
+                        setSelectedCatProduct(null);
+                        setSelectedVariantId(null);
+                      }}>
+                      + Add
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div style={{borderTop:'1px solid var(--border)',paddingTop:'10px'}}>
+                <button className="button ghost" type="button" style={{fontSize:'0.8rem',marginBottom:'8px'}} onClick={() => setAddingCustom(v => !v)}>
+                  {addingCustom ? '▲ Cancel custom part' : '+ Add custom / unlisted part'}
+                </button>
+                {addingCustom && (
+                  <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                    <div style={{display:'flex',gap:'6px'}}>
+                      <select value={customRole} onChange={e => setCustomRole(e.target.value as ComponentRole)}
+                        style={{flex:1,padding:'5px 8px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}}>
+                        {ALL_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                      </select>
+                      <input type="number" min={1} max={20} value={customQty} onChange={e => setCustomQty(Number(e.target.value))}
+                        style={{width:52,padding:'5px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
+                    </div>
+                    <input placeholder="Part name *" value={customName} onChange={e => setCustomName(e.target.value)}
+                      style={{padding:'5px 9px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
+                    <input placeholder="Manufacturer (optional)" value={customMfr} onChange={e => setCustomMfr(e.target.value)}
+                      style={{padding:'5px 9px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
+                    <input placeholder="Notes (optional)" value={customNotes} onChange={e => setCustomNotes(e.target.value)}
+                      style={{padding:'5px 9px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
+                    <button className="button" type="button" style={{alignSelf:'flex-start'}} disabled={!customName.trim()}
+                      onClick={() => {
+                        if (!customName.trim()) return;
+                        addPendingComponent(null, null, customRole, customQty, customName.trim(), customMfr.trim() || undefined, customNotes.trim() || undefined);
+                        setCustomName('');
+                        setCustomMfr('');
+                        setCustomNotes('');
+                        setAddingCustom(false);
+                      }}>
+                      + Add custom part
+                    </button>
+                  </div>
+                )}
+              </div>
               {pendingComponents.length > 0 && (
                 <div style={{border:'1px solid var(--border)',borderRadius:'8px',padding:'10px'}}>
                   <div style={{fontSize:'0.8rem',fontWeight:700,color:'var(--text-muted)',marginBottom:'8px'}}>SELECTED PARTS ({pendingComponents.length})</div>
                   {pendingComponents.map(c => (
-                    <div key={c._key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',marginBottom:'4px'}}>
-                      <span style={{fontSize:'0.8rem'}}>{ROLE_LABELS[c.component_role]}: {c.display_name}</span>
-                      <button type="button" className="button ghost" style={{padding:'2px 8px',fontSize:'0.72rem'}} onClick={() => removePendingComponent(c._key)}>Remove</button>
+                    <div key={c._key} style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'5px',padding:'5px 7px',borderRadius:'5px',background:'var(--surface2)'}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:'0.8rem',fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.display_name}</div>
+                        <div style={{fontSize:'0.7rem',color:'var(--text-muted)'}}>
+                          {ROLE_LABELS[c.component_role]} · qty {c.quantity}
+                          {c.display_mfr && ` · ${c.display_mfr}`}
+                        </div>
+                      </div>
+                      <input type="number" min={1} max={20} value={c.quantity}
+                        onChange={e => setPendingComponents(prev => prev.map(x => x._key === c._key ? {...x, quantity: Number(e.target.value)} : x))}
+                        style={{width:42,padding:'2px 4px',borderRadius:'4px',border:'1px solid var(--border)',background:'var(--surface)',color:'var(--text)',fontSize:'0.78rem'}} />
+                      <button type="button" style={{background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer',fontSize:'0.9rem',padding:'0 2px'}} onClick={() => removePendingComponent(c._key)}>✕</button>
                     </div>
                   ))}
                 </div>
@@ -1001,10 +1144,45 @@ export default function HomePage() {
 
           {createStep === 3 && (
             <form className="stack" onSubmit={(event) => void handleCreateDrone(event)}>
-              <div style={{fontSize:'0.82rem',color:'var(--text-muted)'}}>Review details and create drone.</div>
+              <div style={{border:'1px solid var(--border)',borderRadius:'8px',padding:'12px',marginBottom:'4px'}}>
+                <div style={{fontSize:'0.78rem',fontWeight:700,color:'var(--text-muted)',marginBottom:'8px',letterSpacing:'0.05em'}}>DRONE SUMMARY</div>
+                <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'3px 10px',fontSize:'0.83rem'}}>
+                  {[
+                    ['Name', createBasicData['name']],
+                    ['Status', createBasicData['status'] ?? 'flyable'],
+                    ['Frame', createBasicData['frame']],
+                    ['Stack', createBasicData['stack']],
+                    ['Motors', createBasicData['motors']],
+                    ['Video', createBasicData['video_system']],
+                    ['Radio', createBasicData['radio_link']],
+                    ['AUW', createBasicData['auw_grams'] ? `${createBasicData['auw_grams']} g` : null],
+                    ['Category', createBasicData['category']],
+                  ].filter(([, v]) => v).map(([k, v]) => (
+                    <Fragment key={String(k)}>
+                      <span style={{color:'var(--text-muted)',fontWeight:600}}>{k}:</span>
+                      <span>{String(v)}</span>
+                    </Fragment>
+                  ))}
+                </div>
+              </div>
+              {pendingComponents.length > 0 ? (
+                <div style={{border:'1px solid var(--border)',borderRadius:'8px',padding:'12px'}}>
+                  <div style={{fontSize:'0.78rem',fontWeight:700,color:'var(--text-muted)',marginBottom:'8px',letterSpacing:'0.05em'}}>HARDWARE BUILD ({pendingComponents.length} parts)</div>
+                  {pendingComponents.map(c => (
+                    <div key={c._key} style={{fontSize:'0.82rem',marginBottom:'4px',display:'flex',gap:'8px'}}>
+                      <span style={{color:'var(--text-muted)',minWidth:120}}>{ROLE_LABELS[c.component_role]}</span>
+                      <span style={{fontWeight:600}}>{c.display_name}</span>
+                      {c.quantity > 1 && <span style={{color:'var(--text-muted)'}}>×{c.quantity}</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{fontSize:'0.82rem',color:'var(--text-muted)',padding:'6px 0'}}>No hardware parts selected. Drone will be created without a build configuration.</div>
+              )}
               <div className="actions">
                 <button className="button ghost" type="button" onClick={() => setCreateStep(2)}>← Back to Parts</button>
                 <button className="button" type="submit">✓ Create drone</button>
+                <button className="button ghost" type="button" style={{marginLeft:'auto'}} onClick={resetWizard}>Cancel</button>
               </div>
             </form>
           )}
