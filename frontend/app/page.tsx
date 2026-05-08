@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { FormEvent, Fragment, useCallback, useEffect, useState, useTransition } from 'react';
 import seedJson from '../data/drone-parts-mapping.seed.json';
 
@@ -280,6 +282,12 @@ const STATUS_META: Record<DroneStatus, {label: string; color: string; bg: string
 };
 
 export default function HomePage() {
+  const pathname = usePathname();
+  const isDronesPage = pathname === '/drones';
+  const isBatteriesPage = pathname === '/batteries';
+  const showDroneSections = !isBatteriesPage;
+  const showBatterySections = !isDronesPage;
+
   const [drones, setDrones] = useState<Drone[]>([]);
   const [batteries, setBatteries] = useState<Battery[]>([]);
   const [selectedDroneId, setSelectedDroneId] = useState<number | null>(null);
@@ -900,6 +908,13 @@ export default function HomePage() {
         <div className={`status${statusIsError ? ' status-error' : ''}`}>{isPending ? 'Refreshing...' : status}</div>
       </section>
 
+      <nav className="subnav" aria-label="Main navigation">
+        <Link className={`subnav-link${pathname === '/' ? ' active' : ''}`} href="/">Overview</Link>
+        <Link className={`subnav-link${isDronesPage ? ' active' : ''}`} href="/drones">Drones</Link>
+        <Link className={`subnav-link${isBatteriesPage ? ' active' : ''}`} href="/batteries">Batteries</Link>
+      </nav>
+
+      {showDroneSections && (
       <section className="hero-grid">
         <article className="panel span-4">
           <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'12px'}}>
@@ -1481,8 +1496,9 @@ export default function HomePage() {
           </div>
         </article>
       </section>
+      )}
 
-      {selectedDrone ? (
+      {showDroneSections && selectedDrone ? (
         <section className="content-grid">
           <article className="panel span-4">
             <h3>Create snapshot</h3>
@@ -1773,6 +1789,7 @@ export default function HomePage() {
       ) : null}
 
       {/* ── Battery fleet (global, not per-drone) ─────────────────────────── */}
+      {showBatterySections && (
       <section className="content-grid">
         <article className="panel span-4">
           <h2>Add battery</h2>
@@ -1847,6 +1864,7 @@ export default function HomePage() {
           )}
         </article>
       </section>
+      )}
     </main>
   );
 }

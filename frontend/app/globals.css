@@ -46,9 +46,38 @@ button {
 }
 
 .page-shell {
-  width: min(1200px, calc(100vw - 32px));
+  width: min(1440px, calc(100vw - 32px));
   margin: 0 auto;
   padding: 32px 0 56px;
+}
+
+.subnav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0 18px;
+}
+
+.subnav-link {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.subnav-link:hover {
+  border-color: var(--border-hover);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.subnav-link.active {
+  border-color: rgba(232, 116, 42, 0.42);
+  background: rgba(232, 116, 42, 0.16);
+  color: #ffd9c5;
 }
 
 .hero {
@@ -360,5 +389,26 @@ button.card:hover {
   .panel {
     padding: 16px;
     border-radius: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .actions {
+    width: 100%;
+  }
+
+  .actions .button,
+  .actions .subnav-link {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .badge-row {
+    gap: 4px;
+  }
+
+  .code-box {
+    max-height: 280px;
+    font-size: 0.76rem;
   }
 }
