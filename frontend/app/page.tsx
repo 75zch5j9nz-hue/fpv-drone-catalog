@@ -57,11 +57,13 @@ type Drone = {
   registration_country: string | null;
   registration_expiry: string | null;
   remote_id_module: string | null;
+  current_build_version_id: number | null;
   created_at: string;
   updated_at: string;
   snapshots: Snapshot[];
   flight_notes: Note[];
   maintenance_events: Note[];
+  current_hardware: InstalledComponent[];
 };
 
 type Battery = {
@@ -95,6 +97,63 @@ type CompareResponse = {
   diff: string;
 };
 
+// ── Catalogue types ────────────────────────────────────────────────────────────
+
+type ComponentRole =
+  | 'FRAME' | 'FLIGHT_CONTROLLER' | 'ESC' | 'FC_ESC_STACK' | 'AIO_BOARD'
+  | 'MOTOR' | 'PROPELLER' | 'RECEIVER' | 'VTX_VIDEO_UNIT' | 'CAMERA'
+  | 'ANTENNA' | 'GPS' | 'BATTERY' | 'ACCESSORY' | 'OTHER';
+
+const ROLE_DEFAULT_QTY: Partial<Record<ComponentRole, number>> = { MOTOR: 4, PROPELLER: 4 };
+const ROLE_LABELS: Record<ComponentRole, string> = {
+  FRAME: 'Frame', FLIGHT_CONTROLLER: 'Flight Controller', ESC: 'ESC',
+  FC_ESC_STACK: 'FC + ESC Stack', AIO_BOARD: 'AIO Board', MOTOR: 'Motor',
+  PROPELLER: 'Propeller', RECEIVER: 'Receiver', VTX_VIDEO_UNIT: 'VTX / Video',
+  CAMERA: 'Camera', ANTENNA: 'Antenna', GPS: 'GPS', BATTERY: 'Battery',
+  ACCESSORY: 'Accessory', OTHER: 'Other',
+};
+const ALL_ROLES: ComponentRole[] = [
+  'FRAME','FC_ESC_STACK','FLIGHT_CONTROLLER','ESC','AIO_BOARD',
+  'MOTOR','PROPELLER','RECEIVER','VTX_VIDEO_UNIT','CAMERA',
+  'ANTENNA','GPS','BATTERY','ACCESSORY','OTHER',
+];
+
+type Manufacturer = { id: number; name: string; slug: string; website: string | null; };
+type ProductCategory = { id: number; name: string; slug: string; component_role: string; };
+type ProductVariant = { id: number; slug: string; name: string; specs: string | null; is_active: boolean; };
+type CatalogueProduct = {
+  id: number; slug: string; name: string; component_role: string;
+  tags: string | null; image_url: string | null; is_active: boolean;
+  manufacturer: Manufacturer | null; category: ProductCategory | null;
+  variants: ProductVariant[];
+};
+
+type InstalledComponent = {
+  id: number; build_version_id: number; component_role: ComponentRole;
+  product_id: number | null; product_variant_id: number | null;
+  custom_name: string | null; custom_manufacturer: string | null;
+  custom_notes: string | null; quantity: number;
+  firmware_version: string | null;
+  installed_at: string; removed_at: string | null;
+  product: CatalogueProduct | null; product_variant: ProductVariant | null;
+};
+
+// Pending component selection (before saving drone)
+type PendingComponent = {
+  _key: string; // client-side uniqueness key
+  component_role: ComponentRole;
+  product_id: number | null;
+  product_variant_id: number | null;
+  custom_name: string | null;
+  custom_manufacturer: string | null;
+  custom_notes: string | null;
+  quantity: number;
+  // Display helpers
+  display_name: string;
+  display_mfr: string | null;
+};
+
+// Drone templates used for quick-fill
 type DroneTemplate = {
   brand: string;
   model: string;
@@ -236,6 +295,29 @@ export default function HomePage() {
   const [statusIsError, setStatusIsError] = useState(false);
   const [isPending, startTransition] = useTransition();
 
+  // ── Create Drone wizard ────────────────────────────────────────────────────
+  const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
+  const [createBasicData, setCreateBasicData] = useState<Record<string, string>>({});
+  const [pendingComponents, setPendingComponents] = useState<PendingComponent[]>([]);
+  // Catalogue state
+  const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
+  const [catalogue, setCatalogue] = useState<CatalogueProduct[]>([]);
+  const [catFilter, setCatFilter] = useState<{ mfr: string; role: string; search: string }>({ mfr: '', role: '', search: '' });
+  const [catLoaded, setCatLoaded] = useState(false);
+  const [selectedCatProduct, setSelectedCatProduct] = useState<CatalogueProduct | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+  const [addingRole, setAddingRole] = useState<ComponentRole | null>(null);
+  // Custom part form
+  const [addingCustom, setAddingCustom] = useState(false);
+  const [customRole, setCustomRole] = useState<ComponentRole>('OTHER');
+  const [customName, setCustomName] = useState('');
+  const [customMfr, setCustomMfr] = useState('');
+  const [customNotes, setCustomNotes] = useState('');
+  const [customQty, setCustomQty] = useState(1);
+  // Hardware history panel for a selected drone
+  const [showHwHistory, setShowHwHistory] = useState<number | null>(null); // drone id
+  const [hwHistory, setHwHistory] = useState<InstalledComponent[]>([]);
+
   function setOk(msg: string) { setStatusIsError(false); setStatus(msg); }
   function setErr(msg: string) { setStatusIsError(true); setStatus(msg); }
 
@@ -283,6 +365,63 @@ export default function HomePage() {
     });
   }, []);
 
+  async function loadCatalogue() {
+    if (catLoaded) return;
+    try {
+      const [mfrs, prods] = await Promise.all([
+        apiFetch<Manufacturer[]>('/api/manufacturers'),
+        apiFetch<CatalogueProduct[]>('/api/products'),
+      ]);
+      setManufacturers(mfrs);
+      setCatalogue(prods);
+      setCatLoaded(true);
+    } catch (_e) {
+      // catalogue may be empty — that's ok
+      setCatLoaded(true);
+    }
+  }
+
+  function addPendingComponent(product: CatalogueProduct | null, variantId: number | null, role: ComponentRole, qty: number, customN?: string, customM?: string, customNts?: string) {
+    const _key = `${role}-${Date.now()}`;
+    const display_name = product ? product.name : (customN ?? '');
+    const display_mfr = product?.manufacturer?.name ?? customM ?? null;
+    const variantObj = variantId ? (product?.variants.find(v => v.id === variantId) ?? null) : null;
+    const fullDisplayName = variantObj ? `${display_name} (${variantObj.name})` : display_name;
+    setPendingComponents(prev => [...prev, {
+      _key,
+      component_role: role,
+      product_id: product?.id ?? null,
+      product_variant_id: variantId,
+      custom_name: product ? null : (customN ?? null),
+      custom_manufacturer: product ? null : (customM ?? null),
+      custom_notes: customNts ?? null,
+      quantity: qty,
+      display_name: fullDisplayName,
+      display_mfr,
+    }]);
+  }
+
+  function removePendingComponent(key: string) {
+    setPendingComponents(prev => prev.filter(c => c._key !== key));
+  }
+
+  function resetWizard() {
+    setCreateStep(1);
+    setCreateBasicData({});
+    setPendingComponents([]);
+    setSelectedCatProduct(null);
+    setSelectedVariantId(null);
+    setAddingRole(null);
+    setAddingCustom(false);
+    setCustomName('');
+    setCustomMfr('');
+    setCustomNotes('');
+    setCustomQty(1);
+    setCatFilter({ mfr: '', role: '', search: '' });
+  }
+
+
+
   const selectedDrone = drones.find((drone) => drone.id === selectedDroneId) ?? null;
   const selectedSnapshot = selectedDrone?.snapshots.find((snapshot) => snapshot.id === selectedSnapshotId) ?? null;
 
@@ -299,36 +438,56 @@ export default function HomePage() {
 
   async function handleCreateDrone(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const auwRaw = formData.get('auw_grams') as string | null;
+    if (createStep === 1) {
+      // Save Step 1 data and advance to Step 2
+      const form = event.currentTarget;
+      const formData = new FormData(form);
+      const data: Record<string, string> = {};
+      formData.forEach((v, k) => { data[k] = v as string; });
+      setCreateBasicData(data);
+      setCreateStep(2);
+      void loadCatalogue();
+      return;
+    }
+    // Step 3: Final submission
+    const auwRaw = createBasicData['auw_grams'];
     try {
       const drone = await apiFetch<Drone>('/api/drones', {
         method: 'POST',
         body: JSON.stringify({
-          name: formData.get('name'),
-          frame: formData.get('frame') || null,
-          stack: formData.get('stack') || null,
-          motors: formData.get('motors') || null,
-          props: formData.get('props') || null,
-          notes: formData.get('notes') || null,
-          status: formData.get('status') || 'flyable',
+          name: createBasicData['name'],
+          frame: createBasicData['frame'] || null,
+          stack: createBasicData['stack'] || null,
+          motors: createBasicData['motors'] || null,
+          props: createBasicData['props'] || null,
+          notes: createBasicData['notes'] || null,
+          status: createBasicData['status'] || 'flyable',
           auw_grams: auwRaw ? parseInt(auwRaw, 10) : null,
-          fc_target: formData.get('fc_target') || null,
-          radio_link: formData.get('radio_link') || null,
-          video_system: formData.get('video_system') || null,
-          image_url: formData.get('image_url') || null,
-          category: formData.get('category') || null,
-          operator_id: formData.get('operator_id') || null,
-          registration_country: formData.get('registration_country') || null,
-          registration_expiry: formData.get('registration_expiry') || null,
-          remote_id_module: formData.get('remote_id_module') || null,
+          fc_target: createBasicData['fc_target'] || null,
+          radio_link: createBasicData['radio_link'] || null,
+          video_system: createBasicData['video_system'] || null,
+          image_url: createBasicData['image_url'] || null,
+          category: createBasicData['category'] || null,
+          operator_id: createBasicData['operator_id'] || null,
+          registration_country: createBasicData['registration_country'] || null,
+          registration_expiry: createBasicData['registration_expiry'] || null,
+          remote_id_module: createBasicData['remote_id_module'] || null,
+          create_default_build: pendingComponents.length > 0,
+          installed_components: pendingComponents.map(c => ({
+            component_role: c.component_role,
+            product_id: c.product_id,
+            product_variant_id: c.product_variant_id,
+            custom_name: c.custom_name,
+            custom_manufacturer: c.custom_manufacturer,
+            custom_notes: c.custom_notes,
+            quantity: c.quantity,
+          })),
         }),
       });
-      form.reset();
+      resetWizard();
       const preferredId = selectedDroneId ?? drone.id;
       await loadDrones(preferredId);
-      setOk(`Created drone ${drone.name}.`);
+      setOk(`Created drone ${drone.name} with ${pendingComponents.length} component(s).`);
     } catch (error) {
       setErr((error as Error).message);
     }
@@ -693,181 +852,162 @@ export default function HomePage() {
 
       <section className="hero-grid">
         <article className="panel span-4">
-          <h2>Create drone</h2>
-          <form className="stack" onSubmit={(event) => void handleCreateDrone(event)}>
-            <label className="field">
-              <span>Name</span>
-              <input name="name" placeholder="Apex 5" required />
-            </label>
-            <div className="two-col">
+          <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'12px'}}>
+            {([1,2,3] as const).map(s => (
+              <Fragment key={s}>
+                <div style={{width:24,height:24,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',
+                  fontSize:'0.75rem',fontWeight:700,
+                  background: createStep === s ? 'var(--accent)' : createStep > s ? '#4fc38a' : 'var(--surface2)',
+                  color: createStep >= s ? '#fff' : 'var(--text-muted)'}}>
+                  {createStep > s ? '✓' : s}
+                </div>
+                {s < 3 && <div style={{flex:1,height:2,background: createStep > s ? '#4fc38a' : 'var(--border)'}} />}
+              </Fragment>
+            ))}
+            <span style={{fontSize:'0.78rem',color:'var(--text-muted)',marginLeft:'4px'}}>
+              {createStep === 1 ? 'Basic Info' : createStep === 2 ? 'Hardware / Parts' : 'Review & Save'}
+            </span>
+          </div>
+
+          <h2 style={{marginTop:0}}>
+            {createStep === 1 ? 'Create drone' : createStep === 2 ? 'Select parts' : 'Review & Save'}
+          </h2>
+
+          {createStep === 1 && (
+            <form className="stack" onSubmit={(event) => void handleCreateDrone(event)}>
               <label className="field">
-                <span>Frame</span>
-                <input name="frame" placeholder="5 inch freestyle" />
+                <span>Name</span>
+                <input name="name" placeholder="Apex 5" required defaultValue={createBasicData['name'] ?? ''} />
               </label>
-              <label className="field">
-                <span>Stack</span>
-                <input name="stack" placeholder="F7 55A" />
-              </label>
-              <label className="field">
-                <span>Motors</span>
-                <input name="motors" placeholder="2207 1960KV" />
-              </label>
-              <label className="field">
-                <span>Props</span>
-                <input name="props" placeholder="5.1x3.6x3" />
-              </label>
-            </div>
-            <div className="two-col">
-              <label className="field">
-                <span>Status</span>
-                <select name="status" defaultValue="flyable">
-                  <option value="flyable">Flyable</option>
-                  <option value="needs_repair">Needs repair</option>
-                  <option value="grounded_crash">Crashed / grounded</option>
-                  <option value="in_build">In build</option>
-                  <option value="retired">Retired</option>
-                  <option value="for_parts">For parts</option>
-                </select>
-              </label>
-              <label className="field">
-                <span>AUW (grams)</span>
-                <input name="auw_grams" type="number" placeholder="380" min="1" max="25000" />
-              </label>
-            </div>
-            <div className="two-col">
-              <label className="field">
-                <span>FC target</span>
-                <input name="fc_target" placeholder="SPEEDYBEEF405" />
-              </label>
-              <label className="field">
-                <span>Radio link</span>
-                <select name="radio_link" defaultValue="">
-                  <option value="">Unknown</option>
-                  <option value="ELRS 2.4GHz">ELRS 2.4 GHz</option>
-                  <option value="ELRS 900MHz">ELRS 900 MHz</option>
-                  <option value="TBS Crossfire">TBS Crossfire</option>
-                  <option value="TBS Tracer">TBS Tracer</option>
-                  <option value="FrSky D16">FrSky D16</option>
-                  <option value="FrSky ACCST">FrSky ACCST</option>
-                  <option value="Spektrum">Spektrum</option>
-                  <option value="Other">Other</option>
-                </select>
-              </label>
-            </div>
-            <label className="field">
-              <span>Video system</span>
-              <select name="video_system" defaultValue="">
-                <option value="">Unknown</option>
-                <option value="Analog">Analog</option>
-                <option value="DJI O3">DJI O3</option>
-                <option value="DJI O4">DJI O4</option>
-                <option value="Avatar HD">Avatar HD (Walksnail)</option>
-                <option value="HDZero">HDZero</option>
-                <option value="Walksnail">Walksnail</option>
-              </select>
-            </label>
-            <details>
-              <summary style={{cursor:'pointer',color:'var(--muted)',fontSize:'0.88rem',marginBottom:'6px'}}>EU/EASA regulatory fields</summary>
-              <div className="two-col" style={{marginTop:'8px'}}>
+              <div className="two-col">
+                <label className="field"><span>Frame</span><input name="frame" placeholder="5 inch freestyle" defaultValue={createBasicData['frame'] ?? ''} /></label>
+                <label className="field"><span>Stack</span><input name="stack" placeholder="F7 55A" defaultValue={createBasicData['stack'] ?? ''} /></label>
+                <label className="field"><span>Motors</span><input name="motors" placeholder="2207 1960KV" defaultValue={createBasicData['motors'] ?? ''} /></label>
+                <label className="field"><span>Props</span><input name="props" placeholder="5.1x3.6x3" defaultValue={createBasicData['props'] ?? ''} /></label>
+              </div>
+              <div className="two-col">
                 <label className="field">
-                  <span>Operator ID</span>
-                  <input name="operator_id" placeholder="POL-1234567" />
+                  <span>Status</span>
+                  <select name="status" defaultValue={createBasicData['status'] ?? 'flyable'}>
+                    <option value="flyable">Flyable</option>
+                    <option value="needs_repair">Needs repair</option>
+                    <option value="grounded_crash">Crashed / grounded</option>
+                    <option value="in_build">In build</option>
+                    <option value="retired">Retired</option>
+                    <option value="for_parts">For parts</option>
+                  </select>
                 </label>
+                <label className="field"><span>AUW (grams)</span><input name="auw_grams" type="number" placeholder="380" min="1" max="25000" defaultValue={createBasicData['auw_grams'] ?? ''} /></label>
+              </div>
+              <div className="two-col">
+                <label className="field"><span>FC target</span><input name="fc_target" placeholder="SPEEDYBEEF405" defaultValue={createBasicData['fc_target'] ?? ''} /></label>
                 <label className="field">
-                  <span>Country</span>
-                  <input name="registration_country" placeholder="PL" maxLength={3} />
-                </label>
-                <label className="field">
-                  <span>Registration expiry</span>
-                  <input name="registration_expiry" type="date" />
-                </label>
-                <label className="field">
-                  <span>Remote ID module</span>
-                  <input name="remote_id_module" placeholder="Dronetag Mini" />
+                  <span>Radio link</span>
+                  <select name="radio_link" defaultValue={createBasicData['radio_link'] ?? ''}>
+                    <option value="">Unknown</option>
+                    <option value="ELRS 2.4GHz">ELRS 2.4 GHz</option>
+                    <option value="ELRS 900MHz">ELRS 900 MHz</option>
+                    <option value="TBS Crossfire">TBS Crossfire</option>
+                    <option value="TBS Tracer">TBS Tracer</option>
+                    <option value="FrSky D16">FrSky D16</option>
+                    <option value="FrSky ACCST">FrSky ACCST</option>
+                    <option value="Spektrum">Spektrum</option>
+                    <option value="Other">Other</option>
+                  </select>
                 </label>
               </div>
-            </details>
-            <div className="two-col">
               <label className="field">
-                <span>Category</span>
-                <input name="category" placeholder="freestyle / cinematic / long-range" />
+                <span>Video system</span>
+                <select name="video_system" defaultValue={createBasicData['video_system'] ?? ''}>
+                  <option value="">Unknown</option>
+                  <option value="Analog">Analog</option>
+                  <option value="DJI O3">DJI O3</option>
+                  <option value="DJI O4">DJI O4</option>
+                  <option value="Avatar HD">Avatar HD (Walksnail)</option>
+                  <option value="HDZero">HDZero</option>
+                  <option value="Walksnail">Walksnail</option>
+                </select>
               </label>
-              <label className="field">
-                <span>Image URL (manufacturer photo)</span>
-                <input name="image_url" type="url" placeholder="https://…" />
-              </label>
-            </div>
-            <label className="field">
-              <span>Notes</span>
-              <textarea name="notes" placeholder="Build notes, receiver details, wiring changes..." />
-            </label>
-            <div className="actions">
-              <button className="button" type="submit">Create drone</button>
-              <button className="button ghost" type="button" onClick={() => setShowTemplates(!showTemplates)}>From template</button>
-            </div>
-            {showTemplates && (
-              <div className="edit-panel" style={{marginTop:'10px'}}>
-                {/* Header row */}
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
-                  <h4 style={{margin:0,fontSize:'0.9rem'}}>Quick-fill from brand template</h4>
-                  <button className="button ghost" type="button" style={{fontSize:'0.75rem',padding:'2px 8px'}}
-                    onClick={() => { setShowTemplates(false); setTemplateBrand(''); setTemplateSearch(''); }}>✕ Close</button>
+              <details>
+                <summary style={{cursor:'pointer',color:'var(--muted)',fontSize:'0.88rem',marginBottom:'6px'}}>EU/EASA regulatory fields</summary>
+                <div className="two-col" style={{marginTop:'8px'}}>
+                  <label className="field"><span>Operator ID</span><input name="operator_id" placeholder="POL-1234567" defaultValue={createBasicData['operator_id'] ?? ''} /></label>
+                  <label className="field"><span>Country</span><input name="registration_country" placeholder="PL" maxLength={3} defaultValue={createBasicData['registration_country'] ?? ''} /></label>
+                  <label className="field"><span>Registration expiry</span><input name="registration_expiry" type="date" defaultValue={createBasicData['registration_expiry'] ?? ''} /></label>
+                  <label className="field"><span>Remote ID module</span><input name="remote_id_module" placeholder="Dronetag Mini" defaultValue={createBasicData['remote_id_module'] ?? ''} /></label>
                 </div>
-                {/* Brand tabs */}
-                <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'8px'}}>
-                  {['', 'iFlight', 'GEPRC', 'Flywoo', 'DeepSpaceFPV'].map(b => (
-                    <button key={b || 'all'} type="button"
-                      className={`button ghost${templateBrand === b ? ' active' : ''}`}
-                      style={{fontSize:'0.75rem',padding:'3px 10px'}}
-                      onClick={() => setTemplateBrand(b)}>
-                      {b || 'All brands'}
-                    </button>
+              </details>
+              <div className="two-col">
+                <label className="field"><span>Category</span><input name="category" placeholder="freestyle / cinematic / long-range" defaultValue={createBasicData['category'] ?? ''} /></label>
+                <label className="field"><span>Image URL (manufacturer photo)</span><input name="image_url" type="url" placeholder="https://…" defaultValue={createBasicData['image_url'] ?? ''} /></label>
+              </div>
+              <label className="field"><span>Notes</span><textarea name="notes" placeholder="Build notes, receiver details, wiring changes..." defaultValue={createBasicData['notes'] ?? ''} /></label>
+              <div className="actions">
+                <button className="button" type="submit">Next: Hardware →</button>
+                <button className="button ghost" type="button" onClick={() => setShowTemplates(!showTemplates)}>From template</button>
+              </div>
+            </form>
+          )}
+
+          {createStep === 2 && (
+            <div className="stack">
+              <div style={{display:'flex',gap:'6px',flexWrap:'wrap',alignItems:'center'}}>
+                <input type="text" placeholder="Search parts…" value={catFilter.search}
+                  onChange={e => setCatFilter(f => ({...f, search: e.target.value}))}
+                  style={{flex:1,minWidth:120,padding:'5px 9px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
+                <select value={catFilter.mfr} onChange={e => setCatFilter(f => ({...f, mfr: e.target.value}))}
+                  style={{padding:'5px 8px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}}>
+                  <option value="">All brands</option>
+                  {manufacturers.map(m => <option key={m.id} value={String(m.id)}>{m.name}</option>)}
+                </select>
+                <select value={catFilter.role} onChange={e => setCatFilter(f => ({...f, role: e.target.value}))}
+                  style={{padding:'5px 8px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}}>
+                  <option value="">All roles</option>
+                  {ALL_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                </select>
+              </div>
+              {!catLoaded ? (
+                <div style={{color:'var(--text-muted)',fontSize:'0.85rem',padding:'16px 0'}}>Loading catalogue…</div>
+              ) : (
+                <div style={{maxHeight:240,overflowY:'auto',border:'1px solid var(--border)',borderRadius:'8px',padding:'6px'}}>
+                  {catalogue
+                    .filter(p => (!catFilter.role || p.component_role === catFilter.role) && (!catFilter.mfr || String(p.manufacturer?.id) === catFilter.mfr) && (!catFilter.search || p.name.toLowerCase().includes(catFilter.search.toLowerCase())))
+                    .map(p => (
+                      <div key={p.id} onClick={() => { setSelectedCatProduct(p); setSelectedVariantId(null); setAddingRole(p.component_role as ComponentRole); }}
+                        style={{padding:'7px 10px',borderRadius:'6px',cursor:'pointer',marginBottom:'3px',border:`1px solid ${selectedCatProduct?.id === p.id ? 'var(--accent)' : 'transparent'}`,background: selectedCatProduct?.id === p.id ? 'rgba(96,160,240,0.08)' : 'transparent'}}>
+                        <div style={{fontSize:'0.82rem',fontWeight:600,color:'var(--text)'}}>{p.name}</div>
+                        <div style={{fontSize:'0.72rem',color:'var(--text-muted)'}}>{p.manufacturer?.name} {ROLE_LABELS[p.component_role as ComponentRole] ?? p.component_role}</div>
+                      </div>
+                    ))}
+                </div>
+              )}
+              {pendingComponents.length > 0 && (
+                <div style={{border:'1px solid var(--border)',borderRadius:'8px',padding:'10px'}}>
+                  <div style={{fontSize:'0.8rem',fontWeight:700,color:'var(--text-muted)',marginBottom:'8px'}}>SELECTED PARTS ({pendingComponents.length})</div>
+                  {pendingComponents.map(c => (
+                    <div key={c._key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',marginBottom:'4px'}}>
+                      <span style={{fontSize:'0.8rem'}}>{ROLE_LABELS[c.component_role]}: {c.display_name}</span>
+                      <button type="button" className="button ghost" style={{padding:'2px 8px',fontSize:'0.72rem'}} onClick={() => removePendingComponent(c._key)}>Remove</button>
+                    </div>
                   ))}
                 </div>
-                {/* Search */}
-                <input
-                  type="text"
-                  placeholder="Search model…"
-                  value={templateSearch}
-                  onChange={e => setTemplateSearch(e.target.value)}
-                  style={{width:'100%',marginBottom:'10px',padding:'5px 9px',borderRadius:'6px',
-                    border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',
-                    fontSize:'0.82rem',boxSizing:'border-box'}}
-                />
-                {/* Card grid */}
-                {(() => {
-                  const filtered = DRONE_TEMPLATES.filter(t =>
-                    (!templateBrand || t.brand === templateBrand) &&
-                    (!templateSearch || t.model.toLowerCase().includes(templateSearch.toLowerCase()) ||
-                      t.category.toLowerCase().includes(templateSearch.toLowerCase()))
-                  );
-                  return (
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px',maxHeight:'340px',overflowY:'auto',paddingRight:'2px'}}>
-                      {filtered.map(tpl => (
-                        <button key={`${tpl.brand}-${tpl.model}`} type="button" onClick={() => applyTemplate(tpl)}
-                          style={{textAlign:'left',padding:'9px 11px',borderRadius:'8px',
-                            border:'1px solid var(--border)',background:'var(--surface2)',
-                            cursor:'pointer',display:'flex',flexDirection:'column',gap:'3px'}}>
-                          <div style={{fontSize:'0.68rem',color:'var(--accent)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>{tpl.brand}</div>
-                          <div style={{fontSize:'0.84rem',fontWeight:600,color:'var(--text)',lineHeight:1.25}}>{tpl.model}</div>
-                          <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginTop:'2px'}}>
-                            <span style={{fontSize:'0.67rem',padding:'1px 5px',borderRadius:'4px',background:'rgba(255,255,255,0.07)',color:'var(--text-muted)'}}>{tpl.frame}</span>
-                            {tpl.auw_grams && <span style={{fontSize:'0.67rem',padding:'1px 5px',borderRadius:'4px',background:'rgba(255,255,255,0.07)',color:'var(--text-muted)'}}>{tpl.auw_grams}g</span>}
-                            {tpl.video_system && <span style={{fontSize:'0.67rem',padding:'1px 5px',borderRadius:'4px',background:'rgba(96,160,240,0.13)',color:'#60a0f0'}}>{tpl.video_system}</span>}
-                          </div>
-                        </button>
-                      ))}
-                      {filtered.length === 0 && (
-                        <div style={{gridColumn:'1/-1',textAlign:'center',color:'var(--text-muted)',padding:'24px',fontSize:'0.85rem'}}>
-                          No templates match.
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+              )}
+              <div className="actions" style={{marginTop:'8px'}}>
+                <button className="button ghost" type="button" onClick={() => setCreateStep(1)}>← Back</button>
+                <button className="button" type="button" onClick={() => setCreateStep(3)}>Review →</button>
               </div>
-            )}
-          </form>
+            </div>
+          )}
+
+          {createStep === 3 && (
+            <form className="stack" onSubmit={(event) => void handleCreateDrone(event)}>
+              <div style={{fontSize:'0.82rem',color:'var(--text-muted)'}}>Review details and create drone.</div>
+              <div className="actions">
+                <button className="button ghost" type="button" onClick={() => setCreateStep(2)}>← Back to Parts</button>
+                <button className="button" type="submit">✓ Create drone</button>
+              </div>
+            </form>
+          )}
         </article>
 
         <article className="panel span-8">
@@ -901,15 +1041,10 @@ export default function HomePage() {
                   }
                 }}
               >
-                {/* ── Compact header (always visible) ── */}
                 <div style={{display:'flex',gap:'12px',alignItems:'flex-start'}}>
-                  {/* Thumbnail */}
-                  <div style={{flexShrink:0,width:'72px',height:'54px',borderRadius:'6px',overflow:'hidden',
-                    background:'linear-gradient(135deg,var(--surface2) 0%,rgba(255,255,255,0.04) 100%)',
-                    display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid var(--border)'}}>
+                  <div style={{flexShrink:0,width:'72px',height:'54px',borderRadius:'6px',overflow:'hidden',background:'linear-gradient(135deg,var(--surface2) 0%,rgba(255,255,255,0.04) 100%)',display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid var(--border)'}}>
                     {drone.image_url
-                      ? <img src={drone.image_url} alt={drone.name} style={{width:'100%',height:'100%',objectFit:'cover'}}
-                          onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}}/>
+                      ? <img src={drone.image_url} alt={drone.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}}/>
                       : <span style={{fontSize:'1.3rem',opacity:0.3}}>🚁</span>}
                   </div>
                   <div style={{flex:1,minWidth:0}}>
@@ -921,43 +1056,29 @@ export default function HomePage() {
                     <div className="badge-row" style={{marginTop:'4px'}}>
                       <span className="badge" style={{background:sm.bg,color:sm.color}}>{sm.label}</span>
                       {drone.auw_grams ? <span className="badge">{drone.auw_grams}g</span> : null}
-                      {drone.video_system ? <span className="badge">{drone.video_system}</span> : null}
-                      {drone.radio_link ? <span className="badge">{drone.radio_link}</span> : null}
                     </div>
                   </div>
                 </div>
-
-                {/* ── Full spec card (expanded when selected) ── */}
                 {drone.id === selectedDroneId && (
                   <div style={{marginTop:'14px',paddingTop:'14px',borderTop:'1px solid var(--border)'}} onClick={e=>e.stopPropagation()}>
                     <div style={{display:'flex',gap:'16px',alignItems:'flex-start'}}>
-                      {/* Manufacturer photo */}
                       <div style={{flexShrink:0,width:'200px'}}>
                         {drone.image_url
                           ? <img src={drone.image_url} alt={drone.name}
                               style={{width:'200px',height:'150px',objectFit:'cover',borderRadius:'8px',border:'1px solid var(--border)',display:'block'}}
                               onError={(e)=>{(e.target as HTMLImageElement).parentElement!.innerHTML='<div style="width:200px;height:150px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:3rem;opacity:0.3">🚁</div>';}}/>
-                          : <div style={{width:'200px',height:'150px',borderRadius:'8px',border:'1px solid var(--border)',
-                              background:'var(--surface2)',display:'flex',flexDirection:'column',alignItems:'center',
-                              justifyContent:'center',gap:'6px',color:'var(--text-muted)'}}>
+                          : <div style={{width:'200px',height:'150px',borderRadius:'8px',border:'1px solid var(--border)',background:'var(--surface2)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'6px',color:'var(--text-muted)'}}>
                               <span style={{fontSize:'2.5rem',opacity:0.3}}>🚁</span>
                               <span style={{fontSize:'0.72rem'}}>No image</span>
                             </div>}
                       </div>
-                      {/* Spec table */}
                       <div style={{flex:1,minWidth:0}}>
                         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.82rem'}}>
                           <tbody>
                             {[
-                              ['Frame',       drone.frame],
-                              ['Stack',       drone.stack],
-                              ['Motors',      drone.motors],
-                              ['Props',       drone.props],
-                              ['Video',       drone.video_system],
-                              ['Radio',       drone.radio_link],
-                              ['FC target',   drone.fc_target],
-                              ['AUW',         drone.auw_grams ? `${drone.auw_grams} g` : null],
-                              ['Category',    drone.category],
+                              ['Frame', drone.frame], ['Stack', drone.stack], ['Motors', drone.motors], ['Props', drone.props],
+                              ['Video', drone.video_system], ['Radio', drone.radio_link], ['FC target', drone.fc_target],
+                              ['AUW', drone.auw_grams ? `${drone.auw_grams} g` : null], ['Category', drone.category],
                             ].filter(([,v]) => v).map(([label, value]) => (
                               <tr key={label as string} style={{borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
                                 <td style={{padding:'4px 10px 4px 0',color:'var(--text-muted)',whiteSpace:'nowrap',width:'80px'}}>{label}</td>
@@ -967,6 +1088,25 @@ export default function HomePage() {
                           </tbody>
                         </table>
                         {drone.notes && <p style={{margin:'8px 0 0',fontSize:'0.81rem',color:'var(--text-muted)',lineHeight:1.5}}>{drone.notes}</p>}
+                        {drone.current_hardware && drone.current_hardware.length > 0 && (
+                          <div style={{marginTop:'12px'}}>
+                            <div style={{fontSize:'0.75rem',fontWeight:700,color:'var(--text-muted)',marginBottom:'6px',letterSpacing:'0.05em'}}>CURRENT HARDWARE</div>
+                            <table style={{width:'100%',fontSize:'0.78rem',borderCollapse:'collapse'}}>
+                              <tbody>
+                                {drone.current_hardware.map(c => (
+                                  <tr key={c.id} style={{borderBottom:'1px solid var(--border)'}}>
+                                    <td style={{padding:'3px 6px',color:'var(--text-muted)',whiteSpace:'nowrap'}}>{ROLE_LABELS[c.component_role as ComponentRole] ?? c.component_role}</td>
+                                    <td style={{padding:'3px 6px',fontWeight:600}}>
+                                      {c.product ? `${c.product.manufacturer?.name ? c.product.manufacturer.name + ' ' : ''}${c.product.name}` : c.custom_name}
+                                      {c.product_variant && ` (${c.product_variant.name})`}
+                                    </td>
+                                    <td style={{padding:'3px 6px',color:'var(--text-muted)'}}>{c.quantity > 1 ? `×${c.quantity}` : ''}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'10px',paddingTop:'8px',borderTop:'1px solid var(--border)'}}>

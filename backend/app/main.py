@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
 from .db import Base, engine, get_db
-from .models import Battery, Drone, FileRole, FlightNote, MaintenanceEvent, Snapshot, StoredFile
+from .models import Battery, BuildVersion, Drone, FileRole, FlightNote, InstalledComponent, MaintenanceEvent, Manufacturer, Product, ProductCategory, ProductVariant, Snapshot, StoredFile
 from .parser import parse_betaflight_config
 
 _BF_VERSION_RE = re.compile(r"Betaflight\s*/\s*(?:INAV\s*/\s*)?[^/]+\s+([0-9]+\.[0-9]+\.[0-9]+)", re.IGNORECASE)
@@ -21,6 +21,8 @@ from .schemas import (
     BatteryCreate,
     BatteryOut,
     BatteryUpdate,
+    BuildVersionCreate,
+    BuildVersionOut,
     CompareRequest,
     CompareResponse,
     DroneCreate,
@@ -28,10 +30,22 @@ from .schemas import (
     DroneUpdate,
     FlightNoteCreate,
     FlightNoteOut,
+    InstalledComponentCreate,
+    InstalledComponentOut,
     MaintenanceEventCreate,
     MaintenanceEventOut,
+    ManufacturerCreate,
+    ManufacturerOut,
+    ProductCategoryCreate,
+    ProductCategoryOut,
+    ProductCreate,
+    ProductListOut,
+    ProductOut,
+    ProductVariantCreate,
+    ProductVariantOut,
     RawSnapshotFile,
     RawSnapshotResponse,
+    ReplaceComponentRequest,
     SnapshotCreate,
     SnapshotOut,
     SnapshotUpdate,
@@ -72,6 +86,9 @@ def _run_migrations() -> None:
         ("registration_country", "VARCHAR(10)"),
         ("registration_expiry", "VARCHAR(20)"),
         ("remote_id_module", "VARCHAR(120)"),
+        ("image_url", "VARCHAR(512)"),
+        ("category", "VARCHAR(80)"),
+        ("current_build_version_id", "INTEGER"),
     ]
     with engine.connect() as conn:
         for col, typedef in new_drone_columns:
@@ -93,9 +110,23 @@ def drone_query():
             selectinload(Drone.snapshots).selectinload(Snapshot.files),
             selectinload(Drone.flight_notes),
             selectinload(Drone.maintenance_events),
+            selectinload(Drone.build_versions).selectinload(BuildVersion.installed_components).selectinload(InstalledComponent.product).selectinload(Product.manufacturer),
+            selectinload(Drone.build_versions).selectinload(BuildVersion.installed_components).selectinload(InstalledComponent.product).selectinload(Product.category),
+            selectinload(Drone.build_versions).selectinload(BuildVersion.installed_components).selectinload(InstalledComponent.product).selectinload(Product.variants),
+            selectinload(Drone.build_versions).selectinload(BuildVersion.installed_components).selectinload(InstalledComponent.product_variant),
         )
         .order_by(Drone.created_at.desc())
     )
+
+
+def _get_current_hardware(drone: Drone) -> list[InstalledComponent]:
+    """Return active components from the current build version."""
+    if not drone.current_build_version_id:
+        return []
+    for bv in drone.build_versions:
+        if bv.id == drone.current_build_version_id:
+            return [c for c in bv.installed_components if c.removed_at is None]
+    return []
 
 
 def get_drone_or_404(db: Session, drone_id: int) -> Drone:
@@ -112,8 +143,13 @@ def get_snapshot_or_404(db: Session, snapshot_id: int) -> Snapshot:
     return snapshot
 
 
-def serialize_drone(db: Session, drone_id: int) -> Drone:
-    return get_drone_or_404(db, drone_id)
+def serialize_drone(db: Session, drone_id: int) -> dict:
+    drone = get_drone_or_404(db, drone_id)
+    data = DroneOut.model_validate(drone).model_dump()
+    data["current_hardware"] = [
+        InstalledComponentOut.model_validate(c).model_dump() for c in _get_current_hardware(drone)
+    ]
+    return data
 
 
 def next_unique_slug(db: Session, model, base_slug: str, scope_column=None, scope_value=None, current_id: int | None = None) -> str:
@@ -185,12 +221,25 @@ async def proxy_image(url: str) -> Response:
 
 
 @app.get("/api/drones", response_model=list[DroneOut])
-def list_drones(db: Session = Depends(get_db)) -> list[Drone]:
-    return list(db.execute(drone_query()).scalars().unique())
+def list_drones(db: Session = Depends(get_db)) -> list[dict]:
+    drones = list(db.execute(drone_query()).scalars().unique())
+    return [serialize_drone(db, d.id) for d in drones]
+
+
+def _validate_component_products(db: Session, comp_data: InstalledComponentCreate) -> None:
+    """Verify product_id and product_variant_id exist in the catalogue."""
+    if comp_data.product_id is not None:
+        p = db.execute(select(Product).where(Product.id == comp_data.product_id)).scalar_one_or_none()
+        if not p:
+            raise HTTPException(status_code=422, detail=f"Product id={comp_data.product_id} not found in catalogue")
+    if comp_data.product_variant_id is not None:
+        pv = db.execute(select(ProductVariant).where(ProductVariant.id == comp_data.product_variant_id)).scalar_one_or_none()
+        if not pv:
+            raise HTTPException(status_code=422, detail=f"ProductVariant id={comp_data.product_variant_id} not found")
 
 
 @app.post("/api/drones", response_model=DroneOut, status_code=201)
-def create_drone(payload: DroneCreate, db: Session = Depends(get_db)) -> Drone:
+def create_drone(payload: DroneCreate, db: Session = Depends(get_db)) -> dict:
     base_slug = safe_slug(payload.name, "drone")
     exists = db.execute(select(Drone).where(Drone.name == payload.name)).scalar_one_or_none()
     if exists:
@@ -209,24 +258,50 @@ def create_drone(payload: DroneCreate, db: Session = Depends(get_db)) -> Drone:
         fc_target=payload.fc_target,
         radio_link=payload.radio_link,
         video_system=payload.video_system,
+        image_url=payload.image_url,
+        category=payload.category,
         operator_id=payload.operator_id,
         registration_country=payload.registration_country,
         registration_expiry=payload.registration_expiry,
         remote_id_module=payload.remote_id_module,
     )
     db.add(drone)
+    db.flush()  # get drone.id
+
+    if payload.create_default_build or payload.installed_components:
+        build = BuildVersion(drone_id=drone.id, name="Initial build", is_current=True)
+        db.add(build)
+        db.flush()
+        for comp_data in payload.installed_components:
+            _validate_component_products(db, comp_data)
+            role = comp_data.component_role.value if hasattr(comp_data.component_role, "value") else str(comp_data.component_role)
+            qty = comp_data.quantity if comp_data.quantity is not None else 1
+            comp = InstalledComponent(
+                build_version_id=build.id,
+                component_role=role,
+                product_id=comp_data.product_id,
+                product_variant_id=comp_data.product_variant_id,
+                custom_name=comp_data.custom_name,
+                custom_manufacturer=comp_data.custom_manufacturer,
+                custom_notes=comp_data.custom_notes,
+                quantity=qty,
+                firmware_version=comp_data.firmware_version,
+            )
+            db.add(comp)
+        drone.current_build_version_id = build.id
+
     db.commit()
     db.refresh(drone)
     return serialize_drone(db, drone.id)
 
 
 @app.get("/api/drones/{drone_id}", response_model=DroneOut)
-def get_drone(drone_id: int, db: Session = Depends(get_db)) -> Drone:
-    return get_drone_or_404(db, drone_id)
+def get_drone(drone_id: int, db: Session = Depends(get_db)) -> dict:
+    return serialize_drone(db, drone_id)
 
 
 @app.patch("/api/drones/{drone_id}", response_model=DroneOut)
-def update_drone(drone_id: int, payload: DroneUpdate, db: Session = Depends(get_db)) -> Drone:
+def update_drone(drone_id: int, payload: DroneUpdate, db: Session = Depends(get_db)) -> dict:
     drone = db.execute(select(Drone).where(Drone.id == drone_id)).scalar_one_or_none()
     if not drone:
         raise HTTPException(status_code=404, detail="Drone not found")
@@ -597,3 +672,306 @@ def delete_battery(battery_id: int, db: Session = Depends(get_db)) -> None:
         raise HTTPException(status_code=404, detail="Battery not found")
     db.delete(battery)
     db.commit()
+
+
+# ── Catalogue: Manufacturers ──────────────────────────────────────────────────
+
+@app.get("/api/manufacturers", response_model=list[ManufacturerOut])
+def list_manufacturers(db: Session = Depends(get_db)) -> list[Manufacturer]:
+    return list(db.execute(select(Manufacturer).order_by(Manufacturer.name)).scalars())
+
+
+@app.post("/api/manufacturers", response_model=ManufacturerOut, status_code=201)
+def create_manufacturer(payload: ManufacturerCreate, db: Session = Depends(get_db)) -> Manufacturer:
+    from .storage import safe_slug as _slug
+    slug = _slug(payload.name, "mfr")
+    existing = db.execute(select(Manufacturer).where(Manufacturer.name == payload.name)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="Manufacturer already exists")
+    mfr = Manufacturer(name=payload.name, slug=slug, website=payload.website)
+    db.add(mfr)
+    db.commit()
+    db.refresh(mfr)
+    return mfr
+
+
+# ── Catalogue: Categories ─────────────────────────────────────────────────────
+
+@app.get("/api/categories", response_model=list[ProductCategoryOut])
+def list_categories(db: Session = Depends(get_db)) -> list[ProductCategory]:
+    return list(db.execute(select(ProductCategory).order_by(ProductCategory.name)).scalars())
+
+
+@app.post("/api/categories", response_model=ProductCategoryOut, status_code=201)
+def create_category(payload: ProductCategoryCreate, db: Session = Depends(get_db)) -> ProductCategory:
+    from .storage import safe_slug as _slug
+    slug = _slug(payload.name, "cat")
+    existing = db.execute(select(ProductCategory).where(ProductCategory.name == payload.name)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="Category already exists")
+    cat = ProductCategory(name=payload.name, slug=slug, component_role=payload.component_role.value)
+    db.add(cat)
+    db.commit()
+    db.refresh(cat)
+    return cat
+
+
+# ── Catalogue: Products ───────────────────────────────────────────────────────
+
+import json as _json
+
+
+def _product_query():
+    return (
+        select(Product)
+        .options(
+            selectinload(Product.manufacturer),
+            selectinload(Product.category),
+            selectinload(Product.variants),
+        )
+    )
+
+
+@app.get("/api/products", response_model=list[ProductListOut])
+def list_products(
+    db: Session = Depends(get_db),
+    search: str | None = None,
+    manufacturer_id: int | None = None,
+    category_id: int | None = None,
+    component_role: str | None = None,
+    tag: str | None = None,
+    is_active: bool = True,
+) -> list[Product]:
+    q = _product_query().where(Product.is_active == is_active)
+    if manufacturer_id is not None:
+        q = q.where(Product.manufacturer_id == manufacturer_id)
+    if category_id is not None:
+        q = q.where(Product.category_id == category_id)
+    if component_role is not None:
+        q = q.where(Product.component_role == component_role.upper())
+    if search:
+        q = q.where(Product.name.ilike(f"%{search}%"))
+    if tag:
+        q = q.where(Product.tags.ilike(f"%{tag}%"))
+    return list(db.execute(q.order_by(Product.name)).scalars())
+
+
+@app.get("/api/products/{product_id}", response_model=ProductOut)
+def get_product(product_id: int, db: Session = Depends(get_db)) -> Product:
+    p = db.execute(_product_query().where(Product.id == product_id)).scalar_one_or_none()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return p
+
+
+@app.post("/api/products", response_model=ProductOut, status_code=201)
+def create_product(payload: ProductCreate, db: Session = Depends(get_db)) -> Product:
+    from .storage import safe_slug as _slug
+    base_name = f"{payload.name}"
+    slug = next_unique_slug(db, Product, _slug(base_name, "prod"))
+    specs_json = _json.dumps(payload.specs) if payload.specs else None
+    product = Product(
+        slug=slug,
+        name=payload.name,
+        manufacturer_id=payload.manufacturer_id,
+        category_id=payload.category_id,
+        component_role=payload.component_role.value,
+        description=payload.description,
+        specs=specs_json,
+        tags=payload.tags,
+        image_url=payload.image_url,
+        product_url=payload.product_url,
+    )
+    db.add(product)
+    db.flush()
+    for v in payload.variants:
+        v_slug = next_unique_slug(db, ProductVariant, _slug(f"{base_name}-{v.name}", "var"))
+        variant = ProductVariant(
+            product_id=product.id,
+            slug=v_slug,
+            name=v.name,
+            specs=_json.dumps(v.specs) if v.specs else None,
+        )
+        db.add(variant)
+    db.commit()
+    return db.execute(_product_query().where(Product.id == product.id)).scalar_one()
+
+
+@app.post("/api/products/{product_id}/variants", response_model=ProductVariantOut, status_code=201)
+def add_product_variant(product_id: int, payload: ProductVariantCreate, db: Session = Depends(get_db)) -> ProductVariant:
+    from .storage import safe_slug as _slug
+    p = db.execute(select(Product).where(Product.id == product_id)).scalar_one_or_none()
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found")
+    v_slug = next_unique_slug(db, ProductVariant, _slug(f"{p.name}-{payload.name}", "var"))
+    variant = ProductVariant(
+        product_id=product_id,
+        slug=v_slug,
+        name=payload.name,
+        specs=_json.dumps(payload.specs) if payload.specs else None,
+    )
+    db.add(variant)
+    db.commit()
+    db.refresh(variant)
+    return variant
+
+
+# ── Drone Hardware / Build Versions ───────────────────────────────────────────
+
+def _component_query():
+    return (
+        select(InstalledComponent)
+        .options(
+            selectinload(InstalledComponent.product).selectinload(Product.manufacturer),
+            selectinload(InstalledComponent.product).selectinload(Product.category),
+            selectinload(InstalledComponent.product).selectinload(Product.variants),
+            selectinload(InstalledComponent.product_variant),
+        )
+    )
+
+
+def _get_current_build(db: Session, drone_id: int) -> BuildVersion:
+    """Return current build version, creating one if none exists."""
+    drone = db.execute(select(Drone).where(Drone.id == drone_id)).scalar_one_or_none()
+    if not drone:
+        raise HTTPException(status_code=404, detail="Drone not found")
+    if drone.current_build_version_id:
+        bv = db.execute(select(BuildVersion).where(BuildVersion.id == drone.current_build_version_id)).scalar_one_or_none()
+        if bv:
+            return bv
+    # Create default build version
+    bv = BuildVersion(drone_id=drone_id, name="Initial build", is_current=True)
+    db.add(bv)
+    db.flush()
+    drone.current_build_version_id = bv.id
+    db.commit()
+    db.refresh(bv)
+    return bv
+
+
+@app.get("/api/drones/{drone_id}/components", response_model=list[InstalledComponentOut])
+def list_current_components(drone_id: int, db: Session = Depends(get_db)) -> list[InstalledComponent]:
+    """Return currently installed components (not removed) for the drone's current build."""
+    get_drone_or_404(db, drone_id)
+    drone = db.execute(select(Drone).where(Drone.id == drone_id)).scalar_one_or_none()
+    if not drone or not drone.current_build_version_id:
+        return []
+    return list(
+        db.execute(
+            _component_query()
+            .where(InstalledComponent.build_version_id == drone.current_build_version_id)
+            .where(InstalledComponent.removed_at.is_(None))
+            .order_by(InstalledComponent.component_role)
+        ).scalars()
+    )
+
+
+@app.get("/api/drones/{drone_id}/components/history", response_model=list[InstalledComponentOut])
+def list_component_history(drone_id: int, db: Session = Depends(get_db)) -> list[InstalledComponent]:
+    """Return all components including removed ones across all build versions."""
+    get_drone_or_404(db, drone_id)
+    bv_ids = [
+        row[0] for row in db.execute(
+            select(BuildVersion.id).where(BuildVersion.drone_id == drone_id)
+        ).all()
+    ]
+    if not bv_ids:
+        return []
+    return list(
+        db.execute(
+            _component_query()
+            .where(InstalledComponent.build_version_id.in_(bv_ids))
+            .order_by(InstalledComponent.installed_at.desc())
+        ).scalars()
+    )
+
+
+@app.post("/api/drones/{drone_id}/components", response_model=InstalledComponentOut, status_code=201)
+def add_component(drone_id: int, payload: InstalledComponentCreate, db: Session = Depends(get_db)) -> InstalledComponent:
+    """Add a component to the drone's current build."""
+    get_drone_or_404(db, drone_id)
+    _validate_component_products(db, payload)
+    bv = _get_current_build(db, drone_id)
+    role = payload.component_role.value if hasattr(payload.component_role, "value") else str(payload.component_role)
+    qty = payload.quantity if payload.quantity is not None else 1
+    comp = InstalledComponent(
+        build_version_id=bv.id,
+        component_role=role,
+        product_id=payload.product_id,
+        product_variant_id=payload.product_variant_id,
+        custom_name=payload.custom_name,
+        custom_manufacturer=payload.custom_manufacturer,
+        custom_notes=payload.custom_notes,
+        quantity=qty,
+        firmware_version=payload.firmware_version,
+    )
+    db.add(comp)
+    db.commit()
+    db.refresh(comp)
+    return db.execute(_component_query().where(InstalledComponent.id == comp.id)).scalar_one()
+
+
+@app.delete("/api/drones/{drone_id}/components/{component_id}", status_code=204)
+def remove_component(drone_id: int, component_id: int, db: Session = Depends(get_db)) -> None:
+    """Remove a component. Sets removed_at if it was previously installed, else hard-deletes."""
+    get_drone_or_404(db, drone_id)
+    comp = db.execute(select(InstalledComponent).where(InstalledComponent.id == component_id)).scalar_one_or_none()
+    if not comp:
+        raise HTTPException(status_code=404, detail="Component not found")
+    # Soft-delete: set removed_at
+    comp.removed_at = datetime.utcnow()
+    db.commit()
+
+
+@app.put("/api/drones/{drone_id}/components/{component_id}", response_model=InstalledComponentOut)
+def replace_component(drone_id: int, component_id: int, payload: ReplaceComponentRequest, db: Session = Depends(get_db)) -> InstalledComponent:
+    """
+    Replace an installed component.
+    Old component gets removed_at set (history preserved).
+    New component gets installed_at = now.
+    TODO: If Betaflight snapshots exist after current install, warn that tune may not match.
+    """
+    get_drone_or_404(db, drone_id)
+    old = db.execute(select(InstalledComponent).where(InstalledComponent.id == component_id)).scalar_one_or_none()
+    if not old:
+        raise HTTPException(status_code=404, detail="Component not found")
+    old.removed_at = datetime.utcnow()
+    db.flush()
+    _validate_component_products(db, payload.new_component)
+    bv = _get_current_build(db, drone_id)
+    nc = payload.new_component
+    role = nc.component_role.value if hasattr(nc.component_role, "value") else str(nc.component_role)
+    qty = nc.quantity if nc.quantity is not None else 1
+    new_comp = InstalledComponent(
+        build_version_id=bv.id,
+        component_role=role,
+        product_id=nc.product_id,
+        product_variant_id=nc.product_variant_id,
+        custom_name=nc.custom_name,
+        custom_manufacturer=nc.custom_manufacturer,
+        custom_notes=nc.custom_notes,
+        quantity=qty,
+        firmware_version=nc.firmware_version,
+    )
+    db.add(new_comp)
+    db.commit()
+    db.refresh(new_comp)
+    return db.execute(_component_query().where(InstalledComponent.id == new_comp.id)).scalar_one()
+
+
+@app.get("/api/drones/{drone_id}/build-versions", response_model=list[BuildVersionOut])
+def list_build_versions(drone_id: int, db: Session = Depends(get_db)) -> list[BuildVersion]:
+    get_drone_or_404(db, drone_id)
+    return list(
+        db.execute(
+            select(BuildVersion)
+            .options(
+                selectinload(BuildVersion.installed_components).selectinload(InstalledComponent.product).selectinload(Product.manufacturer),
+                selectinload(BuildVersion.installed_components).selectinload(InstalledComponent.product).selectinload(Product.category),
+                selectinload(BuildVersion.installed_components).selectinload(InstalledComponent.product).selectinload(Product.variants),
+                selectinload(BuildVersion.installed_components).selectinload(InstalledComponent.product_variant),
+            )
+            .where(BuildVersion.drone_id == drone_id)
+            .order_by(BuildVersion.created_at.desc())
+        ).scalars()
+    )
