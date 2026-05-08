@@ -1,0 +1,4163 @@
+{
+  "version": 1,
+  "generated_at": "2026-05-08T12:33:32.192Z",
+  "source_file": "frontend/app/page.tsx#DRONE_TEMPLATES",
+  "template_count": 35,
+  "brands": [
+    "DeepSpaceFPV",
+    "Flywoo",
+    "GEPRC",
+    "iFlight"
+  ],
+  "component_roles": [
+    "FC_ESC_STACK",
+    "FLIGHT_CONTROLLER",
+    "FRAME",
+    "GPS",
+    "MOTOR",
+    "PROPELLER",
+    "RECEIVER",
+    "VTX_VIDEO_UNIT"
+  ],
+  "indexes": {
+    "by_brand": {
+      "iFlight": [
+        "iflight-nazgul-evoque-f5-v2",
+        "iflight-nazgul-evoque-f5d-v2",
+        "iflight-nazgul-evoque-f5-v3",
+        "iflight-nazgul-xl5-eco-o4",
+        "iflight-chimera7-pro-v2-o4",
+        "iflight-chimera5-pro-v2-o4",
+        "iflight-protek35-o4",
+        "iflight-mach-r5-sport",
+        "iflight-defender-20-lite-o4"
+      ],
+      "GEPRC": [
+        "geprc-mark5-analog",
+        "geprc-mark5-dc-o4-pro",
+        "geprc-mark4-hd-o4-pro",
+        "geprc-cinelog30-v3-o4",
+        "geprc-cinelog20-o4",
+        "geprc-smart-35-hd",
+        "geprc-cinebot30-hd-o3",
+        "geprc-cinelog35-v3-o4-pro",
+        "geprc-tern-lr40"
+      ],
+      "Flywoo": [
+        "flywoo-explorer-lr-4-o4",
+        "flywoo-explorer-lr-4-pro-o4",
+        "flywoo-explorer-lr-4-nano",
+        "flywoo-firefly-20-pro-o4-wide",
+        "flywoo-firefly-25-nano-baby-o4",
+        "flywoo-firefly-16-nano-baby-v3-o4",
+        "flywoo-flylens-75-hd-o4",
+        "flywoo-flylens-85-hd-o4",
+        "flywoo-vampire-5-hd-o3"
+      ],
+      "DeepSpaceFPV": [
+        "deepspacefpv-seeker5-o4-pro",
+        "deepspacefpv-seeker5-o3",
+        "deepspacefpv-seeker35-o4-pro",
+        "deepspacefpv-seeker3-o4-pro",
+        "deepspacefpv-seeker3-analog",
+        "deepspacefpv-stellar-25-o4-pro",
+        "deepspacefpv-roc7-o4-pro",
+        "deepspacefpv-roc4-o4-pro"
+      ]
+    },
+    "by_role": {
+      "FRAME": [
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V2",
+          "name": "Nazgul Evoque F5 V2",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5d-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5D V2",
+          "name": "Nazgul Evoque F5D V2",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v3",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V3",
+          "name": "Nazgul Evoque F5 V3",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-xl5-eco-o4",
+          "brand": "iFlight",
+          "model": "Nazgul XL5 ECO O4",
+          "name": "Nazgul XL5 ECO",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-chimera7-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera7 Pro V2 O4",
+          "name": "Chimera7 Pro V2",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-chimera5-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera5 Pro V2 O4",
+          "name": "Chimera5 Pro V2",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-protek35-o4",
+          "brand": "iFlight",
+          "model": "Protek35 O4",
+          "name": "Protek35",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-mach-r5-sport",
+          "brand": "iFlight",
+          "model": "Mach R5 Sport",
+          "name": "Mach R5",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-defender-20-lite-o4",
+          "brand": "iFlight",
+          "model": "Defender 20 Lite O4",
+          "name": "Defender 20",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark5-analog",
+          "brand": "GEPRC",
+          "model": "Mark5 Analog",
+          "name": "GEP-MK5 225mm",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark5-dc-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark5 DC O4 Pro",
+          "name": "GEP-MK5 DC 230mm",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark4-hd-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark4 HD O4 Pro",
+          "name": "GEP-MK4",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog30-v3-o4",
+          "brand": "GEPRC",
+          "model": "CineLog30 V3 O4",
+          "name": "CineLog30 V3",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog20-o4",
+          "brand": "GEPRC",
+          "model": "CineLog20 O4",
+          "name": "CineLog20",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-smart-35-hd",
+          "brand": "GEPRC",
+          "model": "SMART 35 HD",
+          "name": "SMART 35",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinebot30-hd-o3",
+          "brand": "GEPRC",
+          "model": "Cinebot30 HD O3",
+          "name": "Cinebot30 127mm",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog35-v3-o4-pro",
+          "brand": "GEPRC",
+          "model": "CineLog35 V3 O4 Pro",
+          "name": "GEP-CL35 V3 142mm",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-tern-lr40",
+          "brand": "GEPRC",
+          "model": "Tern LR40",
+          "name": "Tern LR40",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 O4",
+          "name": "Explorer LR 4",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-pro-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 PRO O4",
+          "name": "Explorer LR 4 PRO",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-nano",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 Nano",
+          "name": "Explorer LR 4 Nano",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-20-pro-o4-wide",
+          "brand": "Flywoo",
+          "model": "Firefly 20 PRO O4 Wide",
+          "name": "Firefly 20 PRO",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-25-nano-baby-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 25 Nano Baby O4",
+          "name": "Firefly 25 Nano Baby",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-16-nano-baby-v3-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 16 Nano Baby V3 O4",
+          "name": "Firefly 16 Nano Baby V3",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-flylens-75-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 75 HD O4",
+          "name": "FlyLens 75",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-flylens-85-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 85 HD O4",
+          "name": "FlyLens 85",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-vampire-5-hd-o3",
+          "brand": "Flywoo",
+          "model": "Vampire 5 HD O3",
+          "name": "Vampire 5",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O4 Pro",
+          "name": "SEEKER5 DC/XL 215mm",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o3",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O3",
+          "name": "SEEKER5 DC/XL 215mm",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker35-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER35 O4 Pro",
+          "name": "SEEKER35 DC/XL",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 O4 Pro",
+          "name": "SEEKER3 DC/XL",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-analog",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 Analog",
+          "name": "SEEKER3 DC/XL",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-stellar-25-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "Stellar 25 O4 Pro",
+          "name": "Stellar 25",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-roc7-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC7 O4 Pro",
+          "name": "ROC7 322mm",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-roc4-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC4 O4 Pro",
+          "name": "ROC4 DC-Type",
+          "quantity": 1
+        }
+      ],
+      "FC_ESC_STACK": [
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V2",
+          "name": "BLITZ Mini F7 + E55S 55A",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5d-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5D V2",
+          "name": "BLITZ Mini F722 + 55A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v3",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V3",
+          "name": "BLITZ Mini F7 + 60A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-xl5-eco-o4",
+          "brand": "iFlight",
+          "model": "Nazgul XL5 ECO O4",
+          "name": "BLITZ F7 + 55A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-chimera7-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera7 Pro V2 O4",
+          "name": "BLITZ F7 + 55A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-chimera5-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera5 Pro V2 O4",
+          "name": "BLITZ F7 + 55A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-protek35-o4",
+          "brand": "iFlight",
+          "model": "Protek35 O4",
+          "name": "BLITZ F722 + 45A AIO",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-mach-r5-sport",
+          "brand": "iFlight",
+          "model": "Mach R5 Sport",
+          "name": "BLITZ F7 + 55A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-defender-20-lite-o4",
+          "brand": "iFlight",
+          "model": "Defender 20 Lite O4",
+          "name": "BLITZ F411 AIO + 20A",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark5-analog",
+          "brand": "GEPRC",
+          "model": "Mark5 Analog",
+          "name": "GEPRC F7 + 50A BL_32 ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark5-dc-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark5 DC O4 Pro",
+          "name": "TAKER F7 + 50A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark4-hd-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark4 HD O4 Pro",
+          "name": "TAKER F722 + 45A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog30-v3-o4",
+          "brand": "GEPRC",
+          "model": "CineLog30 V3 O4",
+          "name": "TAKER F411 + 35A AIO",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog20-o4",
+          "brand": "GEPRC",
+          "model": "CineLog20 O4",
+          "name": "TAKER F411 20A AIO",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-smart-35-hd",
+          "brand": "GEPRC",
+          "model": "SMART 35 HD",
+          "name": "GEPRC F722 + 45A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinebot30-hd-o3",
+          "brand": "GEPRC",
+          "model": "Cinebot30 HD O3",
+          "name": "GEPRC F7 45A AIO V2",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog35-v3-o4-pro",
+          "brand": "GEPRC",
+          "model": "CineLog35 V3 O4 Pro",
+          "name": "TAKER F7 + 45A AIO",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-tern-lr40",
+          "brand": "GEPRC",
+          "model": "Tern LR40",
+          "name": "TAKER G4 45A AIO",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 O4",
+          "name": "GOKU F405 AIO + 20A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-pro-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 PRO O4",
+          "name": "GOKU F405 HD + 20A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-nano",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 Nano",
+          "name": "GOKU F405 Nano + 16A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-20-pro-o4-wide",
+          "brand": "Flywoo",
+          "model": "Firefly 20 PRO O4 Wide",
+          "name": "GOKU F405 AIO + 20A",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-25-nano-baby-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 25 Nano Baby O4",
+          "name": "GOKU F405 20A AIO",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-16-nano-baby-v3-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 16 Nano Baby V3 O4",
+          "name": "GOKU F411 5-in-1 + 12A",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-flylens-75-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 75 HD O4",
+          "name": "GOKU F411 12A AIO",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-flylens-85-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 85 HD O4",
+          "name": "GOKU F405 AIO + 20A",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-vampire-5-hd-o3",
+          "brand": "Flywoo",
+          "model": "Vampire 5 HD O3",
+          "name": "GOKU F745 AIO + 45A",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O4 Pro",
+          "name": "HAKRC F722 V2 + 60A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o3",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O3",
+          "name": "HAKRC F722 V2 + 60A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker35-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER35 O4 Pro",
+          "name": "TALOS F722AIO BL32-40A",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 O4 Pro",
+          "name": "HAKRC F722 mini V2 + 40A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-analog",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 Analog",
+          "name": "HAKRC F722 mini V2 + 40A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-stellar-25-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "Stellar 25 O4 Pro",
+          "name": "TALOS F722AIO BL32-40A",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-roc7-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC7 O4 Pro",
+          "name": "HAKRC F722 V2 + 60A ESC",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-roc4-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC4 O4 Pro",
+          "name": "TALOS F722AIO BL32-40A",
+          "quantity": 1
+        }
+      ],
+      "FLIGHT_CONTROLLER": [
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V2",
+          "name": "IFLIGHT_BLITZ_F7_PRO",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5d-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5D V2",
+          "name": "IFLIGHT_BLITZ_F722",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v3",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V3",
+          "name": "IFLIGHT_BLITZ_F7_PRO",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-xl5-eco-o4",
+          "brand": "iFlight",
+          "model": "Nazgul XL5 ECO O4",
+          "name": "IFLIGHT_BLITZ_F722",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-chimera7-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera7 Pro V2 O4",
+          "name": "IFLIGHT_BLITZ_F7_PRO",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-chimera5-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera5 Pro V2 O4",
+          "name": "IFLIGHT_BLITZ_F7_PRO",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-protek35-o4",
+          "brand": "iFlight",
+          "model": "Protek35 O4",
+          "name": "IFLIGHT_BLITZ_F722",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-mach-r5-sport",
+          "brand": "iFlight",
+          "model": "Mach R5 Sport",
+          "name": "IFLIGHT_BLITZ_F7_PRO",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-defender-20-lite-o4",
+          "brand": "iFlight",
+          "model": "Defender 20 Lite O4",
+          "name": "IFLIGHT_BLITZ_F411RX",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark5-analog",
+          "brand": "GEPRC",
+          "model": "Mark5 Analog",
+          "name": "GEPRCF722",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark5-dc-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark5 DC O4 Pro",
+          "name": "GEPRCF722_BT_HD",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark4-hd-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark4 HD O4 Pro",
+          "name": "GEPRCF722_BT_HD",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog30-v3-o4",
+          "brand": "GEPRC",
+          "model": "CineLog30 V3 O4",
+          "name": "GEPRCF405_BT_HD",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog20-o4",
+          "brand": "GEPRC",
+          "model": "CineLog20 O4",
+          "name": "GEPRCF405_BT_HD",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-smart-35-hd",
+          "brand": "GEPRC",
+          "model": "SMART 35 HD",
+          "name": "GEPRCF722",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinebot30-hd-o3",
+          "brand": "GEPRC",
+          "model": "Cinebot30 HD O3",
+          "name": "GEPRCF745_BT_HD",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog35-v3-o4-pro",
+          "brand": "GEPRC",
+          "model": "CineLog35 V3 O4 Pro",
+          "name": "GEPRCF722_BT_HD",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-tern-lr40",
+          "brand": "GEPRC",
+          "model": "Tern LR40",
+          "name": "GEPRCF405_BT_HD",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 O4",
+          "name": "FLYWOOF405",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-pro-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 PRO O4",
+          "name": "FLYWOOF405",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-nano",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 Nano",
+          "name": "FLYWOOF405",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-20-pro-o4-wide",
+          "brand": "Flywoo",
+          "model": "Firefly 20 PRO O4 Wide",
+          "name": "FLYWOOF405",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-25-nano-baby-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 25 Nano Baby O4",
+          "name": "FLYWOOF405",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-16-nano-baby-v3-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 16 Nano Baby V3 O4",
+          "name": "FLYWOOF411_AIO",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-flylens-75-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 75 HD O4",
+          "name": "FLYWOOF411_AIO",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-flylens-85-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 85 HD O4",
+          "name": "FLYWOOF405",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-vampire-5-hd-o3",
+          "brand": "Flywoo",
+          "model": "Vampire 5 HD O3",
+          "name": "FLYWOOF745AIO",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O4 Pro",
+          "name": "HAKRCF722",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o3",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O3",
+          "name": "HAKRCF722",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker35-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER35 O4 Pro",
+          "name": "HAKRCF722MINI",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 O4 Pro",
+          "name": "HAKRCF722MINI",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-analog",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 Analog",
+          "name": "HAKRCF722MINI",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-stellar-25-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "Stellar 25 O4 Pro",
+          "name": "HAKRCF722MINI",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-roc7-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC7 O4 Pro",
+          "name": "HAKRCF722",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-roc4-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC4 O4 Pro",
+          "name": "HAKRCF722MINI",
+          "quantity": 1
+        }
+      ],
+      "MOTOR": [
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V2",
+          "name": "XING2 2207 1750KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5d-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5D V2",
+          "name": "XING2 2207 1750KV 6S",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v3",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V3",
+          "name": "XING2 2207 1750KV 6S",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-nazgul-xl5-eco-o4",
+          "brand": "iFlight",
+          "model": "Nazgul XL5 ECO O4",
+          "name": "XING 2207 1800KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-chimera7-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera7 Pro V2 O4",
+          "name": "XING2 2809 1250KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-chimera5-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera5 Pro V2 O4",
+          "name": "XING2 2207 1750KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-protek35-o4",
+          "brand": "iFlight",
+          "model": "Protek35 O4",
+          "name": "2205.5 2150KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-mach-r5-sport",
+          "brand": "iFlight",
+          "model": "Mach R5 Sport",
+          "name": "XING2 2207 2400KV 6S",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-defender-20-lite-o4",
+          "brand": "iFlight",
+          "model": "Defender 20 Lite O4",
+          "name": "1103 14000KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-mark5-analog",
+          "brand": "GEPRC",
+          "model": "Mark5 Analog",
+          "name": "SPEEDX2 2107.5 1960KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-mark5-dc-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark5 DC O4 Pro",
+          "name": "SPEEDX2 2107.5 1960KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-mark4-hd-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark4 HD O4 Pro",
+          "name": "SPEEDX2 2004 2850KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-cinelog30-v3-o4",
+          "brand": "GEPRC",
+          "model": "CineLog30 V3 O4",
+          "name": "1404 3850KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-cinelog20-o4",
+          "brand": "GEPRC",
+          "model": "CineLog20 O4",
+          "name": "1202.5 6500KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-smart-35-hd",
+          "brand": "GEPRC",
+          "model": "SMART 35 HD",
+          "name": "2105.5 2650KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-cinebot30-hd-o3",
+          "brand": "GEPRC",
+          "model": "Cinebot30 HD O3",
+          "name": "SPEEDX2 1804 2450KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-cinelog35-v3-o4-pro",
+          "brand": "GEPRC",
+          "model": "CineLog35 V3 O4 Pro",
+          "name": "SPEEDX2 2105.5 2650KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-tern-lr40",
+          "brand": "GEPRC",
+          "model": "Tern LR40",
+          "name": "SPEEDX2 1404 3000KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 O4",
+          "name": "ROBO 2004 1700KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-pro-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 PRO O4",
+          "name": "ROBO 2004 1700KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-nano",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 Nano",
+          "name": "1404 2750KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-firefly-20-pro-o4-wide",
+          "brand": "Flywoo",
+          "model": "Firefly 20 PRO O4 Wide",
+          "name": "1404 3800KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-firefly-25-nano-baby-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 25 Nano Baby O4",
+          "name": "1404 4600KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-firefly-16-nano-baby-v3-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 16 Nano Baby V3 O4",
+          "name": "1102 8700KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-flylens-75-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 75 HD O4",
+          "name": "1002 22000KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-flylens-85-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 85 HD O4",
+          "name": "1202.5 12000KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-vampire-5-hd-o3",
+          "brand": "Flywoo",
+          "model": "Vampire 5 HD O3",
+          "name": "ROBO 2207 1750KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O4 Pro",
+          "name": "Aether 2207.3 1960KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o3",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O3",
+          "name": "Aether 2207.3 1960KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-seeker35-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER35 O4 Pro",
+          "name": "Aether 2006 2550KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 O4 Pro",
+          "name": "Aether 1505 4000KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-analog",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 Analog",
+          "name": "Aether 1505 4000KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-stellar-25-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "Stellar 25 O4 Pro",
+          "name": "Aether 1404 4600KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-roc7-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC7 O4 Pro",
+          "name": "RED LINE 2807 1350KV",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-roc4-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC4 O4 Pro",
+          "name": "Aether 1404 3000KV",
+          "quantity": 4
+        }
+      ],
+      "PROPELLER": [
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V2",
+          "name": "5.1\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5d-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5D V2",
+          "name": "5.1\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v3",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V3",
+          "name": "5.1\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-nazgul-xl5-eco-o4",
+          "brand": "iFlight",
+          "model": "Nazgul XL5 ECO O4",
+          "name": "5.1\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-chimera7-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera7 Pro V2 O4",
+          "name": "7\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-chimera5-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera5 Pro V2 O4",
+          "name": "5.1\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-protek35-o4",
+          "brand": "iFlight",
+          "model": "Protek35 O4",
+          "name": "3.5\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-mach-r5-sport",
+          "brand": "iFlight",
+          "model": "Mach R5 Sport",
+          "name": "5.1\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "iflight-defender-20-lite-o4",
+          "brand": "iFlight",
+          "model": "Defender 20 Lite O4",
+          "name": "2\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-mark5-analog",
+          "brand": "GEPRC",
+          "model": "Mark5 Analog",
+          "name": "5\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-mark5-dc-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark5 DC O4 Pro",
+          "name": "5\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-mark4-hd-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark4 HD O4 Pro",
+          "name": "4\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-cinelog30-v3-o4",
+          "brand": "GEPRC",
+          "model": "CineLog30 V3 O4",
+          "name": "3\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-cinelog20-o4",
+          "brand": "GEPRC",
+          "model": "CineLog20 O4",
+          "name": "2\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-smart-35-hd",
+          "brand": "GEPRC",
+          "model": "SMART 35 HD",
+          "name": "3.5\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-cinebot30-hd-o3",
+          "brand": "GEPRC",
+          "model": "Cinebot30 HD O3",
+          "name": "3\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-cinelog35-v3-o4-pro",
+          "brand": "GEPRC",
+          "model": "CineLog35 V3 O4 Pro",
+          "name": "3.5\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "geprc-tern-lr40",
+          "brand": "GEPRC",
+          "model": "Tern LR40",
+          "name": "4\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 O4",
+          "name": "4\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-pro-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 PRO O4",
+          "name": "4\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-nano",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 Nano",
+          "name": "4\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-firefly-20-pro-o4-wide",
+          "brand": "Flywoo",
+          "model": "Firefly 20 PRO O4 Wide",
+          "name": "2\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-firefly-25-nano-baby-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 25 Nano Baby O4",
+          "name": "2.5\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-firefly-16-nano-baby-v3-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 16 Nano Baby V3 O4",
+          "name": "1.6\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-flylens-75-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 75 HD O4",
+          "name": "1.6\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-flylens-85-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 85 HD O4",
+          "name": "2\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "flywoo-vampire-5-hd-o3",
+          "brand": "Flywoo",
+          "model": "Vampire 5 HD O3",
+          "name": "5.1\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O4 Pro",
+          "name": "5.1\" Gemfan 51433",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o3",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O3",
+          "name": "5.1\" Gemfan 51433",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-seeker35-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER35 O4 Pro",
+          "name": "3.5\" HQ DT90mm",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 O4 Pro",
+          "name": "3\" HQProp T3x3x3",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-analog",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 Analog",
+          "name": "3\" HQProp T3x3x3",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-stellar-25-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "Stellar 25 O4 Pro",
+          "name": "2.5\" Gemfan D63",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-roc7-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC7 O4 Pro",
+          "name": "7\"",
+          "quantity": 4
+        },
+        {
+          "template_key": "deepspacefpv-roc4-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC4 O4 Pro",
+          "name": "4\"",
+          "quantity": 4
+        }
+      ],
+      "VTX_VIDEO_UNIT": [
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V2",
+          "name": "Analog",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5d-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5D V2",
+          "name": "DJI O3",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v3",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V3",
+          "name": "DJI O4 Pro",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-xl5-eco-o4",
+          "brand": "iFlight",
+          "model": "Nazgul XL5 ECO O4",
+          "name": "DJI O4",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-chimera7-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera7 Pro V2 O4",
+          "name": "DJI O4 Pro",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-chimera5-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera5 Pro V2 O4",
+          "name": "DJI O4",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-protek35-o4",
+          "brand": "iFlight",
+          "model": "Protek35 O4",
+          "name": "DJI O4",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-mach-r5-sport",
+          "brand": "iFlight",
+          "model": "Mach R5 Sport",
+          "name": "Analog",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-defender-20-lite-o4",
+          "brand": "iFlight",
+          "model": "Defender 20 Lite O4",
+          "name": "DJI O4",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark5-analog",
+          "brand": "GEPRC",
+          "model": "Mark5 Analog",
+          "name": "Analog",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark5-dc-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark5 DC O4 Pro",
+          "name": "DJI O4 Pro",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark4-hd-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark4 HD O4 Pro",
+          "name": "DJI O4 Pro",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog30-v3-o4",
+          "brand": "GEPRC",
+          "model": "CineLog30 V3 O4",
+          "name": "DJI O4",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog20-o4",
+          "brand": "GEPRC",
+          "model": "CineLog20 O4",
+          "name": "DJI O4",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-smart-35-hd",
+          "brand": "GEPRC",
+          "model": "SMART 35 HD",
+          "name": "DJI O3",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinebot30-hd-o3",
+          "brand": "GEPRC",
+          "model": "Cinebot30 HD O3",
+          "name": "DJI O3",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog35-v3-o4-pro",
+          "brand": "GEPRC",
+          "model": "CineLog35 V3 O4 Pro",
+          "name": "DJI O4 Pro",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-tern-lr40",
+          "brand": "GEPRC",
+          "model": "Tern LR40",
+          "name": "Analog",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 O4",
+          "name": "DJI O4",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-pro-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 PRO O4",
+          "name": "DJI O4",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-nano",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 Nano",
+          "name": "Analog",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-20-pro-o4-wide",
+          "brand": "Flywoo",
+          "model": "Firefly 20 PRO O4 Wide",
+          "name": "DJI O4 Wide",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-25-nano-baby-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 25 Nano Baby O4",
+          "name": "DJI O4",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-16-nano-baby-v3-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 16 Nano Baby V3 O4",
+          "name": "DJI O4",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-flylens-75-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 75 HD O4",
+          "name": "DJI O4 Lite",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-flylens-85-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 85 HD O4",
+          "name": "DJI O4",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-vampire-5-hd-o3",
+          "brand": "Flywoo",
+          "model": "Vampire 5 HD O3",
+          "name": "DJI O3",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O4 Pro",
+          "name": "DJI O4 Pro",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o3",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O3",
+          "name": "DJI O3",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker35-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER35 O4 Pro",
+          "name": "DJI O4 Pro",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 O4 Pro",
+          "name": "DJI O4 Pro",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-analog",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 Analog",
+          "name": "Analog",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-stellar-25-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "Stellar 25 O4 Pro",
+          "name": "DJI O4 Pro",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-roc7-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC7 O4 Pro",
+          "name": "DJI O4 Pro",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-roc4-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC4 O4 Pro",
+          "name": "DJI O4 Pro",
+          "quantity": 1
+        }
+      ],
+      "RECEIVER": [
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V2",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5d-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5D V2",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v3",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V3",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-xl5-eco-o4",
+          "brand": "iFlight",
+          "model": "Nazgul XL5 ECO O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-chimera7-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera7 Pro V2 O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-chimera5-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera5 Pro V2 O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-protek35-o4",
+          "brand": "iFlight",
+          "model": "Protek35 O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-mach-r5-sport",
+          "brand": "iFlight",
+          "model": "Mach R5 Sport",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-defender-20-lite-o4",
+          "brand": "iFlight",
+          "model": "Defender 20 Lite O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark5-analog",
+          "brand": "GEPRC",
+          "model": "Mark5 Analog",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark5-dc-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark5 DC O4 Pro",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark4-hd-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark4 HD O4 Pro",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog30-v3-o4",
+          "brand": "GEPRC",
+          "model": "CineLog30 V3 O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog20-o4",
+          "brand": "GEPRC",
+          "model": "CineLog20 O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-smart-35-hd",
+          "brand": "GEPRC",
+          "model": "SMART 35 HD",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinebot30-hd-o3",
+          "brand": "GEPRC",
+          "model": "Cinebot30 HD O3",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog35-v3-o4-pro",
+          "brand": "GEPRC",
+          "model": "CineLog35 V3 O4 Pro",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-tern-lr40",
+          "brand": "GEPRC",
+          "model": "Tern LR40",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-pro-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 PRO O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-nano",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 Nano",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-20-pro-o4-wide",
+          "brand": "Flywoo",
+          "model": "Firefly 20 PRO O4 Wide",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-25-nano-baby-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 25 Nano Baby O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-firefly-16-nano-baby-v3-o4",
+          "brand": "Flywoo",
+          "model": "Firefly 16 Nano Baby V3 O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-flylens-75-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 75 HD O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-flylens-85-hd-o4",
+          "brand": "Flywoo",
+          "model": "FlyLens 85 HD O4",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-vampire-5-hd-o3",
+          "brand": "Flywoo",
+          "model": "Vampire 5 HD O3",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O4 Pro",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o3",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O3",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker35-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER35 O4 Pro",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 O4 Pro",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-analog",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 Analog",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-stellar-25-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "Stellar 25 O4 Pro",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-roc7-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC7 O4 Pro",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-roc4-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC4 O4 Pro",
+          "name": "ELRS 2.4GHz",
+          "quantity": 1
+        }
+      ],
+      "GPS": [
+        {
+          "template_key": "iflight-nazgul-evoque-f5d-v2",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5D V2",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-nazgul-evoque-f5-v3",
+          "brand": "iFlight",
+          "model": "Nazgul Evoque F5 V3",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-chimera7-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera7 Pro V2 O4",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "iflight-chimera5-pro-v2-o4",
+          "brand": "iFlight",
+          "model": "Chimera5 Pro V2 O4",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-mark5-dc-o4-pro",
+          "brand": "GEPRC",
+          "model": "Mark5 DC O4 Pro",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "geprc-cinelog35-v3-o4-pro",
+          "brand": "GEPRC",
+          "model": "CineLog35 V3 O4 Pro",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 O4",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "flywoo-explorer-lr-4-pro-o4",
+          "brand": "Flywoo",
+          "model": "Explorer LR 4 PRO O4",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O4 Pro",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker5-o3",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER5 O3",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker35-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER35 O4 Pro",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 O4 Pro",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-seeker3-analog",
+          "brand": "DeepSpaceFPV",
+          "model": "SEEKER3 Analog",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-stellar-25-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "Stellar 25 O4 Pro",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-roc7-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC7 O4 Pro",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        },
+        {
+          "template_key": "deepspacefpv-roc4-o4-pro",
+          "brand": "DeepSpaceFPV",
+          "model": "ROC4 O4 Pro",
+          "name": "GPS module (listed on manufacturer page)",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  "presets": [
+    {
+      "template_key": "iflight-nazgul-evoque-f5-v2",
+      "brand": "iFlight",
+      "model": "Nazgul Evoque F5 V2",
+      "category": "freestyle",
+      "frame_size": "5\"",
+      "manufacturer_product_url": "https://shop.iflight.com/freestyle-quads-cat29",
+      "manufacturer_image_url": "/api/proxy-image?url=https%3A%2F%2Fiflight.oss-cn-hongkong.aliyuncs.com%2Fstore%2Fproduct%2FNazgul%2FNazgu-F5-V2%2FF5D-V2-O4-M1.png",
+      "notes": "Squashed-X. 4S/6S. Caddx Ratel2 camera.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Nazgul Evoque F5 V2",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "BLITZ Mini F7 + E55S 55A",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "IFLIGHT_BLITZ_F7_PRO",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "XING2 2207 1750KV",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "5.1\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "Analog",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "iflight-nazgul-evoque-f5d-v2",
+      "brand": "iFlight",
+      "model": "Nazgul Evoque F5D V2",
+      "category": "freestyle / cinematic",
+      "frame_size": "5\"",
+      "manufacturer_product_url": "https://shop.iflight.com/freestyle-quads-cat29",
+      "manufacturer_image_url": "/api/proxy-image?url=https%3A%2F%2Fiflight.oss-cn-hongkong.aliyuncs.com%2Fstore%2Fproduct%2FNazgul%2FNazgu-F5-V2%2FF5D-V2-O4-M1.png",
+      "notes": "DeadCat geometry. GPS optional. 4S/6S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Nazgul Evoque F5D V2",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "BLITZ Mini F722 + 55A ESC",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "IFLIGHT_BLITZ_F722",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "XING2 2207 1750KV 6S",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "5.1\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O3",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "iflight-nazgul-evoque-f5-v3",
+      "brand": "iFlight",
+      "model": "Nazgul Evoque F5 V3",
+      "category": "freestyle",
+      "frame_size": "5\"",
+      "manufacturer_product_url": "https://shop.iflight.com/freestyle-quads-cat29",
+      "manufacturer_image_url": "/api/proxy-image?url=https%3A%2F%2Fiflight.oss-cn-hongkong.aliyuncs.com%2Fstore%2Fproduct%2FNazgul%2FNazgul-F5-V3%2FNazgul-F5-V3-M1.jpg",
+      "notes": "DC or X geometry. GPS version available. 2025 flagship.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Nazgul Evoque F5 V3",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "BLITZ Mini F7 + 60A ESC",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "IFLIGHT_BLITZ_F7_PRO",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "XING2 2207 1750KV 6S",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "5.1\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Pro",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "iflight-nazgul-xl5-eco-o4",
+      "brand": "iFlight",
+      "model": "Nazgul XL5 ECO O4",
+      "category": "freestyle",
+      "frame_size": "5\"",
+      "manufacturer_product_url": "https://shop.iflight.com/freestyle-quads-cat29",
+      "manufacturer_image_url": "/api/proxy-image?url=https%3A%2F%2Fiflight.oss-cn-hongkong.aliyuncs.com%2Fstore%2Fproduct%2FEco%2FNazgul-XL5-ECO%2FXL5-ECO-V1.1-N7.png",
+      "notes": "Budget 5-inch with O4-ready layout and serviceable arms.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Nazgul XL5 ECO",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "BLITZ F7 + 55A ESC",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "IFLIGHT_BLITZ_F722",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "XING 2207 1800KV",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "5.1\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "iflight-chimera7-pro-v2-o4",
+      "brand": "iFlight",
+      "model": "Chimera7 Pro V2 O4",
+      "category": "long-range",
+      "frame_size": "7\"",
+      "manufacturer_product_url": "https://shop.iflight.com/long-range-quads-cat325",
+      "manufacturer_image_url": "/api/proxy-image?url=https%3A%2F%2Fiflight.oss-cn-hongkong.aliyuncs.com%2Fstore%2Fproduct%2FChimera7-Pro%2FChimera7-Pro-V2-BNF%2FC7-V2-O4-M7.png",
+      "notes": "Long-range 7-inch platform with GPS and high-efficiency tune profile.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Chimera7 Pro V2",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "BLITZ F7 + 55A ESC",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "IFLIGHT_BLITZ_F7_PRO",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "XING2 2809 1250KV",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "7\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Pro",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "iflight-chimera5-pro-v2-o4",
+      "brand": "iFlight",
+      "model": "Chimera5 Pro V2 O4",
+      "category": "long-range / freestyle",
+      "frame_size": "5\"",
+      "manufacturer_product_url": "https://shop.iflight.com/long-range-quads-cat325",
+      "manufacturer_image_url": null,
+      "notes": "Long-range oriented 5-inch with GPS and deadcat visibility.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Chimera5 Pro V2",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "BLITZ F7 + 55A ESC",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "IFLIGHT_BLITZ_F7_PRO",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "XING2 2207 1750KV",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "5.1\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "iflight-protek35-o4",
+      "brand": "iFlight",
+      "model": "Protek35 O4",
+      "category": "cinematic",
+      "frame_size": "3.5\"",
+      "manufacturer_product_url": "https://shop.iflight.com/cinewhoop-cat370",
+      "manufacturer_image_url": null,
+      "notes": "3.5-inch ducted cinewhoop for proximity and indoor/outdoor cinematic work.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Protek35",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "BLITZ F722 + 45A AIO",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "IFLIGHT_BLITZ_F722",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "2205.5 2150KV",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "3.5\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "iflight-mach-r5-sport",
+      "brand": "iFlight",
+      "model": "Mach R5 Sport",
+      "category": "racing",
+      "frame_size": "5\"",
+      "manufacturer_product_url": "https://shop.iflight.com/race-quads-cat28",
+      "manufacturer_image_url": "/api/proxy-image?url=https%3A%2F%2Fiflight.oss-cn-hongkong.aliyuncs.com%2Foss%2F20260408%2F144451%2Fadmin15%2F49494.png",
+      "notes": "True-X racing frame. High-KV motors. 6S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Mach R5",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "BLITZ F7 + 55A ESC",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "IFLIGHT_BLITZ_F7_PRO",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "XING2 2207 2400KV 6S",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "5.1\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "Analog",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "iflight-defender-20-lite-o4",
+      "brand": "iFlight",
+      "model": "Defender 20 Lite O4",
+      "category": "cinematic / indoor",
+      "frame_size": "2\"",
+      "manufacturer_product_url": "https://shop.iflight.com/cinewhoop-cat370",
+      "manufacturer_image_url": "/api/proxy-image?url=https%3A%2F%2Fiflight.oss-cn-hongkong.aliyuncs.com%2Fstore%2Fproduct%2FDefender%2FD20-Lite%2FD20-Lite-M0.png",
+      "notes": "2-inch ducted cinewhoop. 2S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Defender 20",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "BLITZ F411 AIO + 20A",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "IFLIGHT_BLITZ_F411RX",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "1103 14000KV",
+          "manufacturer_hint": "iFlight",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "2\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "geprc-mark5-analog",
+      "brand": "GEPRC",
+      "model": "Mark5 Analog",
+      "category": "freestyle",
+      "frame_size": "5\"",
+      "manufacturer_product_url": "https://geprc.com/product/geprc-mark5-analog-freestyle-fpv-drone/",
+      "manufacturer_image_url": "https://geprc.com/wp-content/uploads/2022/01/10-8.jpg",
+      "notes": "225mm True-X. HD (O3) and DC O4 Pro variants also available.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "GEP-MK5 225mm",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "GEPRC F7 + 50A BL_32 ESC",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "GEPRCF722",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "SPEEDX2 2107.5 1960KV",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "5\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "Analog",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "geprc-mark5-dc-o4-pro",
+      "brand": "GEPRC",
+      "model": "Mark5 DC O4 Pro",
+      "category": "freestyle / cinematic",
+      "frame_size": "5\"",
+      "manufacturer_product_url": "https://geprc.com/product/geprc-mark5-o4-pro-dc-fpv-drone/",
+      "manufacturer_image_url": "https://geprc.com/wp-content/uploads/2025/04/1_Main_0000-5-600x600.jpg",
+      "notes": "DeadCat GPS. 230mm wheelbase. 2025 release.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "GEP-MK5 DC 230mm",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "TAKER F7 + 50A ESC",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "GEPRCF722_BT_HD",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "SPEEDX2 2107.5 1960KV",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "5\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Pro",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "geprc-mark4-hd-o4-pro",
+      "brand": "GEPRC",
+      "model": "Mark4 HD O4 Pro",
+      "category": "freestyle / compact",
+      "frame_size": "4\"",
+      "manufacturer_product_url": "https://geprc.com/products/",
+      "manufacturer_image_url": null,
+      "notes": "Compact 4-inch build balancing agility and cleaner footage.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "GEP-MK4",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "TAKER F722 + 45A ESC",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "GEPRCF722_BT_HD",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "SPEEDX2 2004 2850KV",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "4\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Pro",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "geprc-cinelog30-v3-o4",
+      "brand": "GEPRC",
+      "model": "CineLog30 V3 O4",
+      "category": "cinematic",
+      "frame_size": "3\"",
+      "manufacturer_product_url": "https://geprc.com/product/geprc-cinelog30-v3-o4-pro-quadcopter/",
+      "manufacturer_image_url": "https://geprc.com/wp-content/uploads/2025/01/1_DeMain_0075-600x600.jpg",
+      "notes": "3-inch ducted platform between CL25 and CL35 for mixed indoor/outdoor work.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "CineLog30 V3",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "TAKER F411 + 35A AIO",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "GEPRCF405_BT_HD",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "1404 3850KV",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "3\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "geprc-cinelog20-o4",
+      "brand": "GEPRC",
+      "model": "CineLog20 O4",
+      "category": "cinematic / indoor",
+      "frame_size": "2\"",
+      "manufacturer_product_url": "https://geprc.com/product/geprc-cinelog20-hd-o3-fpv-drone/",
+      "manufacturer_image_url": "https://geprc.com/wp-content/uploads/2023/01/GEPRC-Cinelog20-HD-O3-FPV-Drone-3-600x600.jpg",
+      "notes": "Compact 2-inch cinewhoop focused on tight spaces and low-noise flights.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "CineLog20",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "TAKER F411 20A AIO",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "GEPRCF405_BT_HD",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "1202.5 6500KV",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "2\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "geprc-smart-35-hd",
+      "brand": "GEPRC",
+      "model": "SMART 35 HD",
+      "category": "freestyle / cinematic",
+      "frame_size": "3.5\"",
+      "manufacturer_product_url": "https://geprc.com/products/",
+      "manufacturer_image_url": null,
+      "notes": "Unducted 3.5-inch with HD payload capacity and robust frame.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "SMART 35",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "GEPRC F722 + 45A ESC",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "GEPRCF722",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "2105.5 2650KV",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "3.5\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O3",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "geprc-cinebot30-hd-o3",
+      "brand": "GEPRC",
+      "model": "Cinebot30 HD O3",
+      "category": "cinematic",
+      "frame_size": "3\"",
+      "manufacturer_product_url": "https://geprc.com/product/geprc-cinebot30-hd-runcam-link-wasp-fpv-drone/",
+      "manufacturer_image_url": "https://geprc.com/wp-content/uploads/2022/10/9-1-600x600.jpg",
+      "notes": "127mm cinewhoop. 4S/6S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Cinebot30 127mm",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "GEPRC F7 45A AIO V2",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "GEPRCF745_BT_HD",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "SPEEDX2 1804 2450KV",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "3\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O3",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "geprc-cinelog35-v3-o4-pro",
+      "brand": "GEPRC",
+      "model": "CineLog35 V3 O4 Pro",
+      "category": "cinematic",
+      "frame_size": "3.5\"",
+      "manufacturer_product_url": "https://geprc.com/product/geprc-cinelog35-v3-o4-pro-fpv-drone/",
+      "manufacturer_image_url": "https://geprc.com/wp-content/uploads/2025/09/1_DeMain_0000-3-600x600.jpg",
+      "notes": "142mm ducted. GPS. 6S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "GEP-CL35 V3 142mm",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "TAKER F7 + 45A AIO",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "GEPRCF722_BT_HD",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "SPEEDX2 2105.5 2650KV",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "3.5\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Pro",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "geprc-tern-lr40",
+      "brand": "GEPRC",
+      "model": "Tern LR40",
+      "category": "long-range",
+      "frame_size": "4\"",
+      "manufacturer_product_url": "https://geprc.com/product/geprc-tern-lr40-hd-o3-long-range-fpv/",
+      "manufacturer_image_url": "https://geprc.com/wp-content/uploads/2023/12/1_Main_0003_00000-4-600x600.jpg",
+      "notes": "Sub-250g 4-inch long range. 4S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Tern LR40",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "TAKER G4 45A AIO",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "GEPRCF405_BT_HD",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "SPEEDX2 1404 3000KV",
+          "manufacturer_hint": "GEPRC",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "4\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "Analog",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "flywoo-explorer-lr-4-o4",
+      "brand": "Flywoo",
+      "model": "Explorer LR 4 O4",
+      "category": "long-range",
+      "frame_size": "4\"",
+      "manufacturer_product_url": "https://flywoo.net/products/explorer-lr-4-o4-sub250-4k-1080p-micro-long-range",
+      "manufacturer_image_url": "https://img-va.myshopline.com/image/store/1673593876355/1-76.jpeg",
+      "notes": "Sub-250g. 3S. GPS PRO variant also available.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Explorer LR 4",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "GOKU F405 AIO + 20A ESC",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "FLYWOOF405",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "ROBO 2004 1700KV",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "4\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "flywoo-explorer-lr-4-pro-o4",
+      "brand": "Flywoo",
+      "model": "Explorer LR 4 PRO O4",
+      "category": "long-range",
+      "frame_size": "4\"",
+      "manufacturer_product_url": "https://flywoo.net/products/explorer-lr-4-o4-pro-sub250-4k-1080p-micro-long-range",
+      "manufacturer_image_url": "https://img-va.myshopline.com/image/store/1673593876355/Explorer-O4PRO-2.jpeg",
+      "notes": "Pro variant with stronger camera protection and GPS-first long-range layout.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Explorer LR 4 PRO",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "GOKU F405 HD + 20A ESC",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "FLYWOOF405",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "ROBO 2004 1700KV",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "4\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "flywoo-explorer-lr-4-nano",
+      "brand": "Flywoo",
+      "model": "Explorer LR 4 Nano",
+      "category": "long-range / ultralight",
+      "frame_size": "4\"",
+      "manufacturer_product_url": "https://flywoo.net/collections/fpv-drone",
+      "manufacturer_image_url": null,
+      "notes": "Ultralight analog LR platform for efficient cruising.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Explorer LR 4 Nano",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "GOKU F405 Nano + 16A ESC",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "FLYWOOF405",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "1404 2750KV",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "4\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "Analog",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "flywoo-firefly-20-pro-o4-wide",
+      "brand": "Flywoo",
+      "model": "Firefly 20 PRO O4 Wide",
+      "category": "cinematic / micro",
+      "frame_size": "2\"",
+      "manufacturer_product_url": "https://flywoo.net/products/firefly-20pro-4s-25mini-3s-o4-wide-micro-drone",
+      "manufacturer_image_url": "https://img-va.myshopline.com/image/store/1673593876355/FIREFLY-20PRO-Drone-kit-4.webp",
+      "notes": "2-inch micro O4 wide-angle. 4S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Firefly 20 PRO",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "GOKU F405 AIO + 20A",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "FLYWOOF405",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "1404 3800KV",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "2\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Wide",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "flywoo-firefly-25-nano-baby-o4",
+      "brand": "Flywoo",
+      "model": "Firefly 25 Nano Baby O4",
+      "category": "micro / freestyle",
+      "frame_size": "2.5\"",
+      "manufacturer_product_url": "https://flywoo.net/collections/fpv-drone",
+      "manufacturer_image_url": null,
+      "notes": "2.5-inch lightweight build tuned for tight freestyle and quick recovery.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Firefly 25 Nano Baby",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "GOKU F405 20A AIO",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "FLYWOOF405",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "1404 4600KV",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "2.5\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "flywoo-firefly-16-nano-baby-v3-o4",
+      "brand": "Flywoo",
+      "model": "Firefly 16 Nano Baby V3 O4",
+      "category": "nano / micro cinematic",
+      "frame_size": "1.6\"",
+      "manufacturer_product_url": "https://flywoo.net/products/firefly16-1s-nano-baby-v3-o4-tiny-drone",
+      "manufacturer_image_url": "https://img-va.myshopline.com/image/store/1673593876355/16-O4-Drone-kit-1-0.jpeg",
+      "notes": "1S nano with upgraded V3 frame and stronger camera cage.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Firefly 16 Nano Baby V3",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "GOKU F411 5-in-1 + 12A",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "FLYWOOF411_AIO",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "1102 8700KV",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "1.6\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "flywoo-flylens-75-hd-o4",
+      "brand": "Flywoo",
+      "model": "FlyLens 75 HD O4",
+      "category": "indoor whoop",
+      "frame_size": "1.6\"",
+      "manufacturer_product_url": "https://flywoo.net/products/flylens-75-hd-o4-2s-whoop-fpv-drone",
+      "manufacturer_image_url": "https://img-va.myshopline.com/image/store/1673593876355/flylens75-O4pro-Drone-kit-3.jpg",
+      "notes": "75mm micro whoop for indoor cinematic lines and low acoustic footprint.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "FlyLens 75",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "GOKU F411 12A AIO",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "FLYWOOF411_AIO",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "1002 22000KV",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "1.6\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Lite",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "flywoo-flylens-85-hd-o4",
+      "brand": "Flywoo",
+      "model": "FlyLens 85 HD O4",
+      "category": "cinematic / indoor whoop",
+      "frame_size": "2\"",
+      "manufacturer_product_url": "https://flywoo.net/products/flylens-85-hd-o4-2s-whoop-fpv-drone",
+      "manufacturer_image_url": "https://img-va.myshopline.com/image/store/1673593876355/flylens85-O4pro-Frame-kit-3.jpg",
+      "notes": "85mm ducted whoop. 2S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "FlyLens 85",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "GOKU F405 AIO + 20A",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "FLYWOOF405",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "1202.5 12000KV",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "2\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "flywoo-vampire-5-hd-o3",
+      "brand": "Flywoo",
+      "model": "Vampire 5 HD O3",
+      "category": "freestyle",
+      "frame_size": "5\"",
+      "manufacturer_product_url": "https://flywoo.net/collections/fpv-drone",
+      "manufacturer_image_url": null,
+      "notes": "5-inch freestyle. 6S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Vampire 5",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "GOKU F745 AIO + 45A",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "FLYWOOF745AIO",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "ROBO 2207 1750KV",
+          "manufacturer_hint": "Flywoo",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "5.1\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O3",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        }
+      ]
+    },
+    {
+      "template_key": "deepspacefpv-seeker5-o4-pro",
+      "brand": "DeepSpaceFPV",
+      "model": "SEEKER5 O4 Pro",
+      "category": "freestyle",
+      "frame_size": "5\"",
+      "manufacturer_product_url": "https://www.deepspacefpv.com/DeepSpace-SEEKER5-5inch-freestyle-FPV-Drone-DJI-O3-Air-Unit-Analog-PNP-with-GPS-6S-p6219507.html",
+      "manufacturer_image_url": "https://www.deepspacefpv.com/cdn/shop/16631/product/detail/20260225/1772006966433_0.png",
+      "notes": "5-inch DC/XL freestyle with GPS. Also O3 and Analog PNP variants. 6S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "SEEKER5 DC/XL 215mm",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "HAKRC F722 V2 + 60A ESC",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "HAKRCF722",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "Aether 2207.3 1960KV",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "5.1\" Gemfan 51433",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Pro",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "deepspacefpv-seeker5-o3",
+      "brand": "DeepSpaceFPV",
+      "model": "SEEKER5 O3",
+      "category": "freestyle",
+      "frame_size": "5\"",
+      "manufacturer_product_url": "https://www.deepspacefpv.com/DeepSpace-SEEKER5-5inch-freestyle-FPV-Drone-DJI-O3-Air-Unit-Analog-PNP-with-GPS-6S-p6219507.html",
+      "manufacturer_image_url": "https://www.deepspacefpv.com/cdn/shop/16631/product/detail/20260225/1772006966433_0.png",
+      "notes": "5-inch DC/XL freestyle with GPS. O3 Air Unit variant. 6S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "SEEKER5 DC/XL 215mm",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "HAKRC F722 V2 + 60A ESC",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "HAKRCF722",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "Aether 2207.3 1960KV",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "5.1\" Gemfan 51433",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O3",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "deepspacefpv-seeker35-o4-pro",
+      "brand": "DeepSpaceFPV",
+      "model": "SEEKER35 O4 Pro",
+      "category": "freestyle",
+      "frame_size": "3.5\"",
+      "manufacturer_product_url": "https://www.deepspacefpv.com/DeepSpace-SEEKER35-35inch-DCXL-freestyle-FPV-Drone-DJI-O4-PRO-Analog-PNP-with-GPS-6S-p6775423.html",
+      "manufacturer_image_url": "https://www.deepspacefpv.com/cdn/shop/16631/product/detail/20251009/1760009123401_0.png",
+      "notes": "3.5-inch DC/XL freestyle, GPS, 6S. Also Analog PNP variant.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "SEEKER35 DC/XL",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "TALOS F722AIO BL32-40A",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "HAKRCF722MINI",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "Aether 2006 2550KV",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "3.5\" HQ DT90mm",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Pro",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "deepspacefpv-seeker3-o4-pro",
+      "brand": "DeepSpaceFPV",
+      "model": "SEEKER3 O4 Pro",
+      "category": "freestyle",
+      "frame_size": "3\"",
+      "manufacturer_product_url": "https://www.deepspacefpv.com/DeepSpace-SEEKER3-3inch-freestyle-FPV-Drone-DJI-O4-PRO-Analog-PNP-with-GPS-4S-sub250g-p6408559.html",
+      "manufacturer_image_url": "https://www.deepspacefpv.com/cdn/shop/16631/product/detail/20260428/1777342060010_0.png",
+      "notes": "Sub-250g 3-inch freestyle with GPS. 4S. DC/XL geometry.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "SEEKER3 DC/XL",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "HAKRC F722 mini V2 + 40A ESC",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "HAKRCF722MINI",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "Aether 1505 4000KV",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "3\" HQProp T3x3x3",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Pro",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "deepspacefpv-seeker3-analog",
+      "brand": "DeepSpaceFPV",
+      "model": "SEEKER3 Analog",
+      "category": "freestyle",
+      "frame_size": "3\"",
+      "manufacturer_product_url": "https://www.deepspacefpv.com/DeepSpace-SEEKER3-3inch-freestyle-FPV-Drone-DJI-O4-PRO-Analog-PNP-with-GPS-4S-sub250g-p6408559.html",
+      "manufacturer_image_url": "https://www.deepspacefpv.com/cdn/shop/16631/product/detail/20260428/1777342060010_0.png",
+      "notes": "Sub-250g 3-inch analog freestyle. GPS. 4S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "SEEKER3 DC/XL",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "HAKRC F722 mini V2 + 40A ESC",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "HAKRCF722MINI",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "Aether 1505 4000KV",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "3\" HQProp T3x3x3",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "Analog",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "deepspacefpv-stellar-25-o4-pro",
+      "brand": "DeepSpaceFPV",
+      "model": "Stellar 25 O4 Pro",
+      "category": "cinematic / micro",
+      "frame_size": "2.5\"",
+      "manufacturer_product_url": "https://www.deepspacefpv.com/DeepSpace-Stellar-25-25inch-Drone-HD-O4PROWithout-Cam-VTXVersion-FPV-Drone-Quadcopter-with-Aether-1404-Motor-p6549463.html",
+      "manufacturer_image_url": "https://www.deepspacefpv.com/cdn/shop/16631/product/detail/20251129/1764385133375_0.jpg",
+      "notes": "2.5-inch micro. GPS optional. O4 Pro (bring cam/VTX). 4S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "Stellar 25",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "TALOS F722AIO BL32-40A",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "HAKRCF722MINI",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "Aether 1404 4600KV",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "2.5\" Gemfan D63",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Pro",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "deepspacefpv-roc7-o4-pro",
+      "brand": "DeepSpaceFPV",
+      "model": "ROC7 O4 Pro",
+      "category": "long-range",
+      "frame_size": "7\"",
+      "manufacturer_product_url": "https://www.deepspacefpv.com/DeepSpace-ROC7-O4PRO-Long-Range-FPV-7Inch-F722-60A-Racing-Drone-Quadcopter-Freestyle-p6638729.html",
+      "manufacturer_image_url": "https://www.deepspacefpv.com/cdn/shop/16631/product/detail/20250729/1753784761400_0.png",
+      "notes": "7-inch long-range freestyle. T700 carbon fiber. GPS. 6S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "ROC7 322mm",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "HAKRC F722 V2 + 60A ESC",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "HAKRCF722",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "RED LINE 2807 1350KV",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "7\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Pro",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    },
+    {
+      "template_key": "deepspacefpv-roc4-o4-pro",
+      "brand": "DeepSpaceFPV",
+      "model": "ROC4 O4 Pro",
+      "category": "long-range",
+      "frame_size": "4\"",
+      "manufacturer_product_url": "https://www.deepspacefpv.com/DeepSpace-ROC-4-FPV-Drone-4-InchLong-Range-Quadcopter-with-GPS-DC-Type-Structure-p6899050.html",
+      "manufacturer_image_url": "https://www.deepspacefpv.com/cdn/shop/16631/product/detail/20260110/1768046292509_0.png",
+      "notes": "4-inch DC-type long range with GPS. Sub-250g. 4S.",
+      "parts": [
+        {
+          "component_role": "FRAME",
+          "quantity": 1,
+          "name": "ROC4 DC-Type",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FC_ESC_STACK",
+          "quantity": 1,
+          "name": "TALOS F722AIO BL32-40A",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "FLIGHT_CONTROLLER",
+          "quantity": 1,
+          "name": "HAKRCF722MINI",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "MOTOR",
+          "quantity": 4,
+          "name": "Aether 1404 3000KV",
+          "manufacturer_hint": "DeepSpaceFPV",
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "PROPELLER",
+          "quantity": 4,
+          "name": "4\"",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "VTX_VIDEO_UNIT",
+          "quantity": 1,
+          "name": "DJI O4 Pro",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "RECEIVER",
+          "quantity": 1,
+          "name": "ELRS 2.4GHz",
+          "manufacturer_hint": null,
+          "source_quality": "direct"
+        },
+        {
+          "component_role": "GPS",
+          "quantity": 1,
+          "name": "GPS module (listed on manufacturer page)",
+          "manufacturer_hint": null,
+          "source_quality": "inferred-from-notes"
+        }
+      ]
+    }
+  ]
+}

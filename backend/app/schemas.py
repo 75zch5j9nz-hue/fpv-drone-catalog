@@ -1,9 +1,170 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .models import FileRole, ParseStatus
+from .models import ComponentRole, FileRole, ParseStatus, ROLE_DEFAULT_QUANTITY
+
+
+# ── Manufacturer ──────────────────────────────────────────────────────────────
+
+class ManufacturerCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    website: str | None = None
+
+
+class ManufacturerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    slug: str
+    website: str | None
+    created_at: datetime
+
+
+# ── ProductCategory ───────────────────────────────────────────────────────────
+
+class ProductCategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    component_role: ComponentRole
+
+
+class ProductCategoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    slug: str
+    component_role: str
+    created_at: datetime
+
+
+# ── ProductVariant ────────────────────────────────────────────────────────────
+
+class ProductVariantCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    specs: dict | None = None
+
+
+class ProductVariantOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    slug: str
+    name: str
+    specs: str | None
+    is_active: bool
+    created_at: datetime
+
+
+# ── Product ───────────────────────────────────────────────────────────────────
+
+class ProductCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    manufacturer_id: int | None = None
+    category_id: int | None = None
+    component_role: ComponentRole
+    description: str | None = None
+    specs: dict | None = None
+    tags: str | None = None
+    image_url: str | None = None
+    product_url: str | None = None
+    variants: list[ProductVariantCreate] = []
+
+
+class ProductOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    slug: str
+    name: str
+    manufacturer_id: int | None
+    category_id: int | None
+    component_role: str
+    description: str | None
+    specs: str | None
+    tags: str | None
+    image_url: str | None
+    product_url: str | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    manufacturer: ManufacturerOut | None
+    category: ProductCategoryOut | None
+    variants: list[ProductVariantOut]
+
+
+class ProductListOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    slug: str
+    name: str
+    component_role: str
+    tags: str | None
+    image_url: str | None
+    is_active: bool
+    manufacturer: ManufacturerOut | None
+    category: ProductCategoryOut | None
+    variants: list[ProductVariantOut]
+
+
+# ── InstalledComponent ────────────────────────────────────────────────────────
+
+class InstalledComponentCreate(BaseModel):
+    component_role: ComponentRole
+    product_id: int | None = None
+    product_variant_id: int | None = None
+    custom_name: str | None = None
+    custom_manufacturer: str | None = None
+    custom_notes: str | None = None
+    quantity: int | None = None
+    firmware_version: str | None = None
+
+    @model_validator(mode="after")
+    def validate_source(self) -> "InstalledComponentCreate":
+        if self.product_id is None and not self.custom_name:
+            raise ValueError("Either product_id or custom_name must be provided")
+        if self.quantity is None:
+            role = self.component_role.value if hasattr(self.component_role, "value") else str(self.component_role)
+            self.quantity = ROLE_DEFAULT_QUANTITY.get(role, 1)
+        return self
+
+
+class InstalledComponentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    build_version_id: int
+    component_role: str
+    product_id: int | None
+    product_variant_id: int | None
+    custom_name: str | None
+    custom_manufacturer: str | None
+    custom_notes: str | None
+    quantity: int
+    firmware_version: str | None
+    installed_at: datetime
+    removed_at: datetime | None
+    product: ProductListOut | None
+    product_variant: ProductVariantOut | None
+
+
+# ── BuildVersion ──────────────────────────────────────────────────────────────
+
+class BuildVersionCreate(BaseModel):
+    name: str = Field(default="Initial build", min_length=1, max_length=160)
+    notes: str | None = None
+    components: list[InstalledComponentCreate] = []
+
+
+class BuildVersionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    drone_id: int
+    name: str
+    notes: str | None
+    is_current: bool
+    created_at: datetime
+    installed_components: list[InstalledComponentOut]
+
+
+
 
 
 class DroneExportOut(BaseModel):
@@ -53,6 +214,9 @@ class DroneCreate(BaseModel):
     registration_country: str | None = None
     registration_expiry: str | None = None
     remote_id_module: str | None = None
+    # Hardware build (optional on creation)
+    create_default_build: bool = False
+    installed_components: list[InstalledComponentCreate] = []
 
 
 class DroneUpdate(BaseModel):
@@ -73,6 +237,10 @@ class DroneUpdate(BaseModel):
     registration_country: str | None = None
     registration_expiry: str | None = None
     remote_id_module: str | None = None
+
+
+class ReplaceComponentRequest(BaseModel):
+    new_component: InstalledComponentCreate
 
 
 class FlightNoteCreate(BaseModel):
@@ -200,11 +368,13 @@ class DroneOut(BaseModel):
     registration_country: str | None
     registration_expiry: str | None
     remote_id_module: str | None
+    current_build_version_id: int | None
     created_at: datetime
     updated_at: datetime
     snapshots: list[SnapshotOut]
     flight_notes: list[FlightNoteOut]
     maintenance_events: list[MaintenanceEventOut]
+    current_hardware: list[InstalledComponentOut] = []
 
 
 class CompareRequest(BaseModel):

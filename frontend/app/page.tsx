@@ -1,6 +1,9 @@
 'use client';
 
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { FormEvent, Fragment, useCallback, useEffect, useState, useTransition } from 'react';
+import seedJson from '../data/drone-parts-mapping.seed.json';
 
 type FileRole = 'dump' | 'diff_all' | 'status' | 'version' | 'photo' | 'blackbox' | 'misc';
 type DroneStatus = 'flyable' | 'needs_repair' | 'grounded_crash' | 'in_build' | 'retired' | 'for_parts';
@@ -57,11 +60,13 @@ type Drone = {
   registration_country: string | null;
   registration_expiry: string | null;
   remote_id_module: string | null;
+  current_build_version_id: number | null;
   created_at: string;
   updated_at: string;
   snapshots: Snapshot[];
   flight_notes: Note[];
   maintenance_events: Note[];
+  current_hardware: InstalledComponent[];
 };
 
 type Battery = {
@@ -95,6 +100,63 @@ type CompareResponse = {
   diff: string;
 };
 
+// ── Catalogue types ────────────────────────────────────────────────────────────
+
+type ComponentRole =
+  | 'FRAME' | 'FLIGHT_CONTROLLER' | 'ESC' | 'FC_ESC_STACK' | 'AIO_BOARD'
+  | 'MOTOR' | 'PROPELLER' | 'RECEIVER' | 'VTX_VIDEO_UNIT' | 'CAMERA'
+  | 'ANTENNA' | 'GPS' | 'BATTERY' | 'ACCESSORY' | 'OTHER';
+
+const ROLE_DEFAULT_QTY: Partial<Record<ComponentRole, number>> = { MOTOR: 4, PROPELLER: 4 };
+const ROLE_LABELS: Record<ComponentRole, string> = {
+  FRAME: 'Frame', FLIGHT_CONTROLLER: 'Flight Controller', ESC: 'ESC',
+  FC_ESC_STACK: 'FC + ESC Stack', AIO_BOARD: 'AIO Board', MOTOR: 'Motor',
+  PROPELLER: 'Propeller', RECEIVER: 'Receiver', VTX_VIDEO_UNIT: 'VTX / Video',
+  CAMERA: 'Camera', ANTENNA: 'Antenna', GPS: 'GPS', BATTERY: 'Battery',
+  ACCESSORY: 'Accessory', OTHER: 'Other',
+};
+const ALL_ROLES: ComponentRole[] = [
+  'FRAME','FC_ESC_STACK','FLIGHT_CONTROLLER','ESC','AIO_BOARD',
+  'MOTOR','PROPELLER','RECEIVER','VTX_VIDEO_UNIT','CAMERA',
+  'ANTENNA','GPS','BATTERY','ACCESSORY','OTHER',
+];
+
+type Manufacturer = { id: number; name: string; slug: string; website: string | null; };
+type ProductCategory = { id: number; name: string; slug: string; component_role: string; };
+type ProductVariant = { id: number; slug: string; name: string; specs: string | null; is_active: boolean; };
+type CatalogueProduct = {
+  id: number; slug: string; name: string; component_role: string;
+  tags: string | null; image_url: string | null; is_active: boolean;
+  manufacturer: Manufacturer | null; category: ProductCategory | null;
+  variants: ProductVariant[];
+};
+
+type InstalledComponent = {
+  id: number; build_version_id: number; component_role: ComponentRole;
+  product_id: number | null; product_variant_id: number | null;
+  custom_name: string | null; custom_manufacturer: string | null;
+  custom_notes: string | null; quantity: number;
+  firmware_version: string | null;
+  installed_at: string; removed_at: string | null;
+  product: CatalogueProduct | null; product_variant: ProductVariant | null;
+};
+
+// Pending component selection (before saving drone)
+type PendingComponent = {
+  _key: string; // client-side uniqueness key
+  component_role: ComponentRole;
+  product_id: number | null;
+  product_variant_id: number | null;
+  custom_name: string | null;
+  custom_manufacturer: string | null;
+  custom_notes: string | null;
+  quantity: number;
+  // Display helpers
+  display_name: string;
+  display_mfr: string | null;
+};
+
+// Drone templates used for quick-fill
 type DroneTemplate = {
   brand: string;
   model: string;
@@ -125,9 +187,9 @@ const DRONE_TEMPLATES: DroneTemplate[] = [
   { brand:'iFlight', model:'Chimera7 Pro V2 O4', frame:'7"', frame_name:'Chimera7 Pro V2', stack:'BLITZ F7 + 55A ESC', motors:'XING2 2809 1250KV', props:'7"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:690, category:'long-range', notes:'Long-range 7-inch platform with GPS and high-efficiency tune profile.',
     image_url:'/api/proxy-image?url=https%3A%2F%2Fiflight.oss-cn-hongkong.aliyuncs.com%2Fstore%2Fproduct%2FChimera7-Pro%2FChimera7-Pro-V2-BNF%2FC7-V2-O4-M7.png', product_url:'https://shop.iflight.com/long-range-quads-cat325' },
   { brand:'iFlight', model:'Chimera5 Pro V2 O4', frame:'5"', frame_name:'Chimera5 Pro V2', stack:'BLITZ F7 + 55A ESC', motors:'XING2 2207 1750KV', props:'5.1"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:458, category:'long-range / freestyle', notes:'Long-range oriented 5-inch with GPS and deadcat visibility.',
-    image_url:null, product_url:'https://shop.iflight.com/long-range-quads-cat325' },
+    image_url:'/api/proxy-image?url=https%3A%2F%2Fiflight.oss-cn-hongkong.aliyuncs.com%2Fstore%2Fproduct%2FChimera7-Pro%2FChimera7-Pro-V2-BNF%2FC7-V2-O4-M7.png', product_url:'https://shop.iflight.com/long-range-quads-cat325' },
   { brand:'iFlight', model:'Protek35 O4', frame:'3.5"', frame_name:'Protek35', stack:'BLITZ F722 + 45A AIO', motors:'2205.5 2150KV', props:'3.5"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F722', auw_grams:286, category:'cinematic', notes:'3.5-inch ducted cinewhoop for proximity and indoor/outdoor cinematic work.',
-    image_url:null, product_url:'https://shop.iflight.com/cinewhoop-cat370' },
+    image_url:'/api/proxy-image?url=https%3A%2F%2Fiflight.oss-cn-hongkong.aliyuncs.com%2Fstore%2Fproduct%2FDefender%2FD20%2FDefender20-M1.png', product_url:'https://shop.iflight.com/cinewhoop-cat370' },
   { brand:'iFlight', model:'Mach R5 Sport', frame:'5"', frame_name:'Mach R5', stack:'BLITZ F7 + 55A ESC', motors:'XING2 2207 2400KV 6S', props:'5.1"', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F7_PRO', auw_grams:335, category:'racing', notes:'True-X racing frame. High-KV motors. 6S.',
     image_url:'/api/proxy-image?url=https%3A%2F%2Fiflight.oss-cn-hongkong.aliyuncs.com%2Foss%2F20260408%2F144451%2Fadmin15%2F49494.png', product_url:'https://shop.iflight.com/race-quads-cat28' },
   { brand:'iFlight', model:'Defender 20 Lite O4', frame:'2"', frame_name:'Defender 20', stack:'BLITZ F411 AIO + 20A', motors:'1103 14000KV', props:'2"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'IFLIGHT_BLITZ_F411RX', auw_grams:88, category:'cinematic / indoor', notes:'2-inch ducted cinewhoop. 2S.',
@@ -137,13 +199,13 @@ const DRONE_TEMPLATES: DroneTemplate[] = [
   { brand:'GEPRC', model:'Mark5 DC O4 Pro', frame:'5"', frame_name:'GEP-MK5 DC 230mm', stack:'TAKER F7 + 50A ESC', motors:'SPEEDX2 2107.5 1960KV', props:'5"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722_BT_HD', auw_grams:395, category:'freestyle / cinematic', notes:'DeadCat GPS. 230mm wheelbase. 2025 release.',
     image_url:'https://geprc.com/wp-content/uploads/2025/04/1_Main_0000-5-600x600.jpg', product_url:'https://geprc.com/product/geprc-mark5-o4-pro-dc-fpv-drone/' },
   { brand:'GEPRC', model:'Mark4 HD O4 Pro', frame:'4"', frame_name:'GEP-MK4', stack:'TAKER F722 + 45A ESC', motors:'SPEEDX2 2004 2850KV', props:'4"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722_BT_HD', auw_grams:258, category:'freestyle / compact', notes:'Compact 4-inch build balancing agility and cleaner footage.',
-    image_url:null, product_url:'https://geprc.com/products/' },
+    image_url:'https://geprc.com/wp-content/uploads/2020/07/14-2-1200x1200.jpg', product_url:'https://geprc.com/products/' },
   { brand:'GEPRC', model:'CineLog30 V3 O4', frame:'3"', frame_name:'CineLog30 V3', stack:'TAKER F411 + 35A AIO', motors:'1404 3850KV', props:'3"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF405_BT_HD', auw_grams:168, category:'cinematic', notes:'3-inch ducted platform between CL25 and CL35 for mixed indoor/outdoor work.',
     image_url:'https://geprc.com/wp-content/uploads/2025/01/1_DeMain_0075-600x600.jpg', product_url:'https://geprc.com/product/geprc-cinelog30-v3-o4-pro-quadcopter/' },
   { brand:'GEPRC', model:'CineLog20 O4', frame:'2"', frame_name:'CineLog20', stack:'TAKER F411 20A AIO', motors:'1202.5 6500KV', props:'2"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF405_BT_HD', auw_grams:112, category:'cinematic / indoor', notes:'Compact 2-inch cinewhoop focused on tight spaces and low-noise flights.',
     image_url:'https://geprc.com/wp-content/uploads/2023/01/GEPRC-Cinelog20-HD-O3-FPV-Drone-3-600x600.jpg', product_url:'https://geprc.com/product/geprc-cinelog20-hd-o3-fpv-drone/' },
   { brand:'GEPRC', model:'SMART 35 HD', frame:'3.5"', frame_name:'SMART 35', stack:'GEPRC F722 + 45A ESC', motors:'2105.5 2650KV', props:'3.5"', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722', auw_grams:232, category:'freestyle / cinematic', notes:'Unducted 3.5-inch with HD payload capacity and robust frame.',
-    image_url:null, product_url:'https://geprc.com/products/' },
+    image_url:'https://geprc.com/wp-content/uploads/2025/09/1_DeMain_0000-3-600x600.jpg', product_url:'https://geprc.com/products/' },
   { brand:'GEPRC', model:'Cinebot30 HD O3', frame:'3"', frame_name:'Cinebot30 127mm', stack:'GEPRC F7 45A AIO V2', motors:'SPEEDX2 1804 2450KV', props:'3"', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF745_BT_HD', auw_grams:195, category:'cinematic', notes:'127mm cinewhoop. 4S/6S.',
     image_url:'https://geprc.com/wp-content/uploads/2022/10/9-1-600x600.jpg', product_url:'https://geprc.com/product/geprc-cinebot30-hd-runcam-link-wasp-fpv-drone/' },
   { brand:'GEPRC', model:'CineLog35 V3 O4 Pro', frame:'3.5"', frame_name:'GEP-CL35 V3 142mm', stack:'TAKER F7 + 45A AIO', motors:'SPEEDX2 2105.5 2650KV', props:'3.5"', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'GEPRCF722_BT_HD', auw_grams:215, category:'cinematic', notes:'142mm ducted. GPS. 6S.',
@@ -155,11 +217,11 @@ const DRONE_TEMPLATES: DroneTemplate[] = [
   { brand:'Flywoo', model:'Explorer LR 4 PRO O4', frame:'4"', frame_name:'Explorer LR 4 PRO', stack:'GOKU F405 HD + 20A ESC', motors:'ROBO 2004 1700KV', props:'4"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:248, category:'long-range', notes:'Pro variant with stronger camera protection and GPS-first long-range layout.',
     image_url:'https://img-va.myshopline.com/image/store/1673593876355/Explorer-O4PRO-2.jpeg', product_url:'https://flywoo.net/products/explorer-lr-4-o4-pro-sub250-4k-1080p-micro-long-range' },
   { brand:'Flywoo', model:'Explorer LR 4 Nano', frame:'4"', frame_name:'Explorer LR 4 Nano', stack:'GOKU F405 Nano + 16A ESC', motors:'1404 2750KV', props:'4"', video_system:'Analog', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:182, category:'long-range / ultralight', notes:'Ultralight analog LR platform for efficient cruising.',
-    image_url:null, product_url:'https://flywoo.net/collections/fpv-drone' },
+    image_url:'https://img-va.myshopline.com/image/store/1673593876355/1-76.jpeg', product_url:'https://flywoo.net/collections/fpv-drone' },
   { brand:'Flywoo', model:'Firefly 20 PRO O4 Wide', frame:'2"', frame_name:'Firefly 20 PRO', stack:'GOKU F405 AIO + 20A', motors:'1404 3800KV', props:'2"', video_system:'DJI O4 Wide', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:78, category:'cinematic / micro', notes:'2-inch micro O4 wide-angle. 4S.',
     image_url:'https://img-va.myshopline.com/image/store/1673593876355/FIREFLY-20PRO-Drone-kit-4.webp', product_url:'https://flywoo.net/products/firefly-20pro-4s-25mini-3s-o4-wide-micro-drone' },
   { brand:'Flywoo', model:'Firefly 25 Nano Baby O4', frame:'2.5"', frame_name:'Firefly 25 Nano Baby', stack:'GOKU F405 20A AIO', motors:'1404 4600KV', props:'2.5"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:118, category:'micro / freestyle', notes:'2.5-inch lightweight build tuned for tight freestyle and quick recovery.',
-    image_url:null, product_url:'https://flywoo.net/collections/fpv-drone' },
+    image_url:'https://img-va.myshopline.com/image/store/1673593876355/FIREFLY-20PRO-Drone-kit-4.webp', product_url:'https://flywoo.net/collections/fpv-drone' },
   { brand:'Flywoo', model:'Firefly 16 Nano Baby V3 O4', frame:'1.6"', frame_name:'Firefly 16 Nano Baby V3', stack:'GOKU F411 5-in-1 + 12A', motors:'1102 8700KV', props:'1.6"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF411_AIO', auw_grams:38, category:'nano / micro cinematic', notes:'1S nano with upgraded V3 frame and stronger camera cage.',
     image_url:'https://img-va.myshopline.com/image/store/1673593876355/16-O4-Drone-kit-1-0.jpeg', product_url:'https://flywoo.net/products/firefly16-1s-nano-baby-v3-o4-tiny-drone' },
   { brand:'Flywoo', model:'FlyLens 75 HD O4', frame:'1.6"', frame_name:'FlyLens 75', stack:'GOKU F411 12A AIO', motors:'1002 22000KV', props:'1.6"', video_system:'DJI O4 Lite', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF411_AIO', auw_grams:46, category:'indoor whoop', notes:'75mm micro whoop for indoor cinematic lines and low acoustic footprint.',
@@ -167,7 +229,7 @@ const DRONE_TEMPLATES: DroneTemplate[] = [
   { brand:'Flywoo', model:'FlyLens 85 HD O4', frame:'2"', frame_name:'FlyLens 85', stack:'GOKU F405 AIO + 20A', motors:'1202.5 12000KV', props:'2"', video_system:'DJI O4', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF405', auw_grams:52, category:'cinematic / indoor whoop', notes:'85mm ducted whoop. 2S.',
     image_url:'https://img-va.myshopline.com/image/store/1673593876355/flylens85-O4pro-Frame-kit-3.jpg', product_url:'https://flywoo.net/products/flylens-85-hd-o4-2s-whoop-fpv-drone' },
   { brand:'Flywoo', model:'Vampire 5 HD O3', frame:'5"', frame_name:'Vampire 5', stack:'GOKU F745 AIO + 45A', motors:'ROBO 2207 1750KV', props:'5.1"', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'FLYWOOF745AIO', auw_grams:375, category:'freestyle', notes:'5-inch freestyle. 6S.',
-    image_url:null, product_url:'https://flywoo.net/collections/fpv-drone' },
+    image_url:'https://img-va.myshopline.com/image/store/1673593876355/Explorer-O4PRO-2.jpeg', product_url:'https://flywoo.net/collections/fpv-drone' },
   { brand:'DeepSpaceFPV', model:'SEEKER5 O4 Pro', frame:'5"', frame_name:'SEEKER5 DC/XL 215mm', stack:'HAKRC F722 V2 + 60A ESC', motors:'Aether 2207.3 1960KV', props:'5.1" Gemfan 51433', video_system:'DJI O4 Pro', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722', auw_grams:382, category:'freestyle', notes:'5-inch DC/XL freestyle with GPS. Also O3 and Analog PNP variants. 6S.',
     image_url:'https://www.deepspacefpv.com/cdn/shop/16631/product/detail/20260225/1772006966433_0.png', product_url:'https://www.deepspacefpv.com/DeepSpace-SEEKER5-5inch-freestyle-FPV-Drone-DJI-O3-Air-Unit-Analog-PNP-with-GPS-6S-p6219507.html' },
   { brand:'DeepSpaceFPV', model:'SEEKER5 O3', frame:'5"', frame_name:'SEEKER5 DC/XL 215mm', stack:'HAKRC F722 V2 + 60A ESC', motors:'Aether 2207.3 1960KV', props:'5.1" Gemfan 51433', video_system:'DJI O3', radio_link:'ELRS 2.4GHz', fc_target:'HAKRCF722', auw_grams:375, category:'freestyle', notes:'5-inch DC/XL freestyle with GPS. O3 Air Unit variant. 6S.',
@@ -220,6 +282,13 @@ const STATUS_META: Record<DroneStatus, {label: string; color: string; bg: string
 };
 
 export default function HomePage() {
+  const pathname = usePathname();
+  const isOverviewPage = pathname === '/';
+  const isDronesPage = pathname === '/drones';
+  const isBatteriesPage = pathname === '/batteries';
+  const showDroneSections = !isBatteriesPage && !isOverviewPage;
+  const showBatterySections = !isDronesPage && !isOverviewPage;
+
   const [drones, setDrones] = useState<Drone[]>([]);
   const [batteries, setBatteries] = useState<Battery[]>([]);
   const [selectedDroneId, setSelectedDroneId] = useState<number | null>(null);
@@ -235,6 +304,30 @@ export default function HomePage() {
   const [status, setStatus] = useState('Loading drones...');
   const [statusIsError, setStatusIsError] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // ── Create Drone wizard ────────────────────────────────────────────────────
+  const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
+  const [createBasicData, setCreateBasicData] = useState<Record<string, string>>({});
+  const [pendingComponents, setPendingComponents] = useState<PendingComponent[]>([]);
+  // Catalogue state
+  const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
+  const [catalogue, setCatalogue] = useState<CatalogueProduct[]>([]);
+  const [catFilter, setCatFilter] = useState<{ mfr: string; role: string; search: string }>({ mfr: '', role: '', search: '' });
+  const [catLoaded, setCatLoaded] = useState(false);
+  const [selectedCatProduct, setSelectedCatProduct] = useState<CatalogueProduct | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+  const [addingRole, setAddingRole] = useState<ComponentRole | null>(null);
+  // Custom part form
+  const [addingCustom, setAddingCustom] = useState(false);
+  const [customRole, setCustomRole] = useState<ComponentRole>('OTHER');
+  const [customName, setCustomName] = useState('');
+  const [customMfr, setCustomMfr] = useState('');
+  const [customNotes, setCustomNotes] = useState('');
+  const [customQty, setCustomQty] = useState(1);
+  // Hardware history panel for a selected drone
+  const [showHwHistory, setShowHwHistory] = useState<number | null>(null); // drone id
+  const [hwHistory, setHwHistory] = useState<InstalledComponent[]>([]);
+  const [droneTab, setDroneTab] = useState<'snapshots' | 'flight-log' | 'maintenance' | 'compare'>('snapshots');
 
   function setOk(msg: string) { setStatusIsError(false); setStatus(msg); }
   function setErr(msg: string) { setStatusIsError(true); setStatus(msg); }
@@ -283,6 +376,65 @@ export default function HomePage() {
     });
   }, []);
 
+  async function loadCatalogue(): Promise<CatalogueProduct[]> {
+    if (catLoaded) return catalogue;
+    try {
+      const [mfrs, prods] = await Promise.all([
+        apiFetch<Manufacturer[]>('/api/manufacturers'),
+        apiFetch<CatalogueProduct[]>('/api/products'),
+      ]);
+      setManufacturers(mfrs);
+      setCatalogue(prods);
+      setCatLoaded(true);
+      return prods;
+    } catch (_e) {
+      // catalogue may be empty — that's ok
+      setCatLoaded(true);
+      return [];
+    }
+  }
+
+  function addPendingComponent(product: CatalogueProduct | null, variantId: number | null, role: ComponentRole, qty: number, customN?: string, customM?: string, customNts?: string) {
+    const _key = `${role}-${Date.now()}`;
+    const display_name = product ? product.name : (customN ?? '');
+    const display_mfr = product?.manufacturer?.name ?? customM ?? null;
+    const variantObj = variantId ? (product?.variants.find(v => v.id === variantId) ?? null) : null;
+    const fullDisplayName = variantObj ? `${display_name} (${variantObj.name})` : display_name;
+    setPendingComponents(prev => [...prev, {
+      _key,
+      component_role: role,
+      product_id: product?.id ?? null,
+      product_variant_id: variantId,
+      custom_name: product ? null : (customN ?? null),
+      custom_manufacturer: product ? null : (customM ?? null),
+      custom_notes: customNts ?? null,
+      quantity: qty,
+      display_name: fullDisplayName,
+      display_mfr,
+    }]);
+  }
+
+  function removePendingComponent(key: string) {
+    setPendingComponents(prev => prev.filter(c => c._key !== key));
+  }
+
+  function resetWizard() {
+    setCreateStep(1);
+    setCreateBasicData({});
+    setPendingComponents([]);
+    setSelectedCatProduct(null);
+    setSelectedVariantId(null);
+    setAddingRole(null);
+    setAddingCustom(false);
+    setCustomName('');
+    setCustomMfr('');
+    setCustomNotes('');
+    setCustomQty(1);
+    setCatFilter({ mfr: '', role: '', search: '' });
+  }
+
+
+
   const selectedDrone = drones.find((drone) => drone.id === selectedDroneId) ?? null;
   const selectedSnapshot = selectedDrone?.snapshots.find((snapshot) => snapshot.id === selectedSnapshotId) ?? null;
 
@@ -299,36 +451,56 @@ export default function HomePage() {
 
   async function handleCreateDrone(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const auwRaw = formData.get('auw_grams') as string | null;
+    if (createStep === 1) {
+      // Save Step 1 data and advance to Step 2
+      const form = event.currentTarget;
+      const formData = new FormData(form);
+      const data: Record<string, string> = {};
+      formData.forEach((v, k) => { data[k] = v as string; });
+      setCreateBasicData(data);
+      setCreateStep(2);
+      void loadCatalogue();
+      return;
+    }
+    // Step 3: Final submission
+    const auwRaw = createBasicData['auw_grams'];
     try {
       const drone = await apiFetch<Drone>('/api/drones', {
         method: 'POST',
         body: JSON.stringify({
-          name: formData.get('name'),
-          frame: formData.get('frame') || null,
-          stack: formData.get('stack') || null,
-          motors: formData.get('motors') || null,
-          props: formData.get('props') || null,
-          notes: formData.get('notes') || null,
-          status: formData.get('status') || 'flyable',
+          name: createBasicData['name'],
+          frame: createBasicData['frame'] || null,
+          stack: createBasicData['stack'] || null,
+          motors: createBasicData['motors'] || null,
+          props: createBasicData['props'] || null,
+          notes: createBasicData['notes'] || null,
+          status: createBasicData['status'] || 'flyable',
           auw_grams: auwRaw ? parseInt(auwRaw, 10) : null,
-          fc_target: formData.get('fc_target') || null,
-          radio_link: formData.get('radio_link') || null,
-          video_system: formData.get('video_system') || null,
-          image_url: formData.get('image_url') || null,
-          category: formData.get('category') || null,
-          operator_id: formData.get('operator_id') || null,
-          registration_country: formData.get('registration_country') || null,
-          registration_expiry: formData.get('registration_expiry') || null,
-          remote_id_module: formData.get('remote_id_module') || null,
+          fc_target: createBasicData['fc_target'] || null,
+          radio_link: createBasicData['radio_link'] || null,
+          video_system: createBasicData['video_system'] || null,
+          image_url: createBasicData['image_url'] || null,
+          category: createBasicData['category'] || null,
+          operator_id: createBasicData['operator_id'] || null,
+          registration_country: createBasicData['registration_country'] || null,
+          registration_expiry: createBasicData['registration_expiry'] || null,
+          remote_id_module: createBasicData['remote_id_module'] || null,
+          create_default_build: pendingComponents.length > 0,
+          installed_components: pendingComponents.map(c => ({
+            component_role: c.component_role,
+            product_id: c.product_id,
+            product_variant_id: c.product_variant_id,
+            custom_name: c.custom_name,
+            custom_manufacturer: c.custom_manufacturer,
+            custom_notes: c.custom_notes,
+            quantity: c.quantity,
+          })),
         }),
       });
-      form.reset();
+      resetWizard();
       const preferredId = selectedDroneId ?? drone.id;
       await loadDrones(preferredId);
-      setOk(`Created drone ${drone.name}.`);
+      setOk(`Created drone ${drone.name} with ${pendingComponents.length} component(s).`);
     } catch (error) {
       setErr((error as Error).message);
     }
@@ -534,7 +706,7 @@ export default function HomePage() {
     link.click();
   }
 
-  function applyTemplate(template: DroneTemplate) {
+  async function applyTemplate(template: DroneTemplate) {
     setShowTemplates(false);
     const nameInput = document.querySelector<HTMLInputElement>('form input[name="name"]');
     if (nameInput) {
@@ -553,6 +725,53 @@ export default function HomePage() {
       const videoSelect = document.querySelector<HTMLSelectElement>('form select[name="video_system"]');
       if (videoSelect && template.video_system) videoSelect.value = template.video_system;
     }
+
+    // Auto-populate pendingComponents from seed data
+    const preset = (seedJson as { presets: Array<{ brand: string; model: string; parts: Array<{ component_role: string; name: string; quantity: number; manufacturer_hint: string | null }> }> }).presets
+      .find(p => p.brand === template.brand && p.model === template.model);
+    if (!preset) return;
+
+    // Load catalogue products so we can match by name+role
+    const products = await loadCatalogue();
+
+    setPendingComponents([]);
+    const newPending: PendingComponent[] = [];
+    for (const part of preset.parts) {
+      const role = part.component_role as ComponentRole;
+      // Try exact name + role match against catalogue
+      const catProduct = products.find(
+        p => p.name === part.name && p.component_role === part.component_role
+      ) ?? null;
+      const _key = `${role}-${Date.now()}-${Math.random()}`;
+      if (catProduct) {
+        newPending.push({
+          _key,
+          component_role: role,
+          product_id: catProduct.id,
+          product_variant_id: null,
+          custom_name: null,
+          custom_manufacturer: null,
+          custom_notes: null,
+          quantity: part.quantity,
+          display_name: catProduct.name,
+          display_mfr: catProduct.manufacturer?.name ?? null,
+        });
+      } else {
+        newPending.push({
+          _key,
+          component_role: role,
+          product_id: null,
+          product_variant_id: null,
+          custom_name: part.name,
+          custom_manufacturer: part.manufacturer_hint ?? template.brand,
+          custom_notes: null,
+          quantity: part.quantity,
+          display_name: part.name,
+          display_mfr: part.manufacturer_hint ?? template.brand,
+        });
+      }
+    }
+    setPendingComponents(newPending);
   }
 
   async function copyToClipboard(text: string) {
@@ -691,183 +910,421 @@ export default function HomePage() {
         <div className={`status${statusIsError ? ' status-error' : ''}`}>{isPending ? 'Refreshing...' : status}</div>
       </section>
 
+      <nav className="subnav" aria-label="Main navigation">
+        <Link className={`subnav-link${isOverviewPage ? ' active' : ''}`} href="/">Overview</Link>
+        <Link className={`subnav-link${isDronesPage ? ' active' : ''}`} href="/drones">Drones</Link>
+        <Link className={`subnav-link${isBatteriesPage ? ' active' : ''}`} href="/batteries">Batteries</Link>
+        <Link className={`subnav-link${pathname === '/catalogue' ? ' active' : ''}`} href="/catalogue">Catalogue</Link>
+        <Link className={`subnav-link${pathname === '/snapshots' ? ' active' : ''}`} href="/snapshots">Snapshots</Link>
+      </nav>
+
+      {isOverviewPage && (
+        <div className="overview-landing">
+          <div className="stat-strip">
+            <div className="stat-card">
+              <span className="stat-value">{drones.length}</span>
+              <span className="stat-label">Total Drones</span>
+            </div>
+            <div className="stat-card stat-green">
+              <span className="stat-value">{drones.filter(d => d.status === 'flyable').length}</span>
+              <span className="stat-label">Flyable</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value">{drones.reduce((n, d) => n + d.snapshots.length, 0)}</span>
+              <span className="stat-label">Snapshots</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value">{batteries.length}</span>
+              <span className="stat-label">Batteries</span>
+            </div>
+          </div>
+
+          <div className="quick-nav">
+            <Link href="/drones" className="quick-card">
+              <span className="quick-icon">🚁</span>
+              <span className="quick-title">Drones</span>
+              <span className="quick-sub">Manage fleet, create &amp; configure drones</span>
+            </Link>
+            <Link href="/batteries" className="quick-card">
+              <span className="quick-icon">🔋</span>
+              <span className="quick-title">Batteries</span>
+              <span className="quick-sub">Track LiPo / LiHV battery health &amp; cycles</span>
+            </Link>
+            <Link href="/catalogue" className="quick-card">
+              <span className="quick-icon">📦</span>
+              <span className="quick-title">Parts Catalogue</span>
+              <span className="quick-sub">Browse components across manufacturers</span>
+            </Link>
+            <Link href="/snapshots" className="quick-card">
+              <span className="quick-icon">📸</span>
+              <span className="quick-title">Snapshots</span>
+              <span className="quick-sub">Betaflight configs &amp; backups across all drones</span>
+            </Link>
+          </div>
+
+          {drones.length > 0 && (
+            <div className="recent-section">
+              <div className="recent-header">
+                <h3>Recent Drones</h3>
+                <Link href="/drones" className="see-all-link">View all {drones.length} →</Link>
+              </div>
+              <div className="recent-list">
+                {drones.slice(0, 6).map(d => (
+                  <Link key={d.id} href="/drones" className="recent-item">
+                    {d.image_url
+                      ? <img src={d.image_url} alt="" className="recent-thumb" />
+                      : <div className="recent-thumb-placeholder">🚁</div>}
+                    <div className="recent-item-info">
+                      <span className="recent-name">{d.name}</span>
+                      <span className="recent-meta" style={{background: STATUS_META[d.status].bg, color: STATUS_META[d.status].color}}>
+                        {STATUS_META[d.status].label}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showDroneSections && (
       <section className="hero-grid">
         <article className="panel span-4">
-          <h2>Create drone</h2>
-          <form className="stack" onSubmit={(event) => void handleCreateDrone(event)}>
-            <label className="field">
-              <span>Name</span>
-              <input name="name" placeholder="Apex 5" required />
-            </label>
-            <div className="two-col">
+          <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'12px'}}>
+            {([1,2,3] as const).map(s => (
+              <Fragment key={s}>
+                <div style={{width:24,height:24,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',
+                  fontSize:'0.75rem',fontWeight:700,
+                  background: createStep === s ? 'var(--accent)' : createStep > s ? '#4fc38a' : 'var(--surface2)',
+                  color: createStep >= s ? '#fff' : 'var(--text-muted)'}}>
+                  {createStep > s ? '✓' : s}
+                </div>
+                {s < 3 && <div style={{flex:1,height:2,background: createStep > s ? '#4fc38a' : 'var(--border)'}} />}
+              </Fragment>
+            ))}
+            <span style={{fontSize:'0.78rem',color:'var(--text-muted)',marginLeft:'4px'}}>
+              {createStep === 1 ? 'Basic Info' : createStep === 2 ? 'Hardware / Parts' : 'Review & Save'}
+            </span>
+          </div>
+
+          <h2 style={{marginTop:0}}>
+            {createStep === 1 ? 'Create drone' : createStep === 2 ? 'Select parts' : 'Review & Save'}
+          </h2>
+
+          {createStep === 1 && (
+            <form className="stack" onSubmit={(event) => void handleCreateDrone(event)}>
               <label className="field">
-                <span>Frame</span>
-                <input name="frame" placeholder="5 inch freestyle" />
+                <span>Name</span>
+                <input name="name" placeholder="Apex 5" required defaultValue={createBasicData['name'] ?? ''} />
               </label>
-              <label className="field">
-                <span>Stack</span>
-                <input name="stack" placeholder="F7 55A" />
-              </label>
-              <label className="field">
-                <span>Motors</span>
-                <input name="motors" placeholder="2207 1960KV" />
-              </label>
-              <label className="field">
-                <span>Props</span>
-                <input name="props" placeholder="5.1x3.6x3" />
-              </label>
-            </div>
-            <div className="two-col">
-              <label className="field">
-                <span>Status</span>
-                <select name="status" defaultValue="flyable">
-                  <option value="flyable">Flyable</option>
-                  <option value="needs_repair">Needs repair</option>
-                  <option value="grounded_crash">Crashed / grounded</option>
-                  <option value="in_build">In build</option>
-                  <option value="retired">Retired</option>
-                  <option value="for_parts">For parts</option>
-                </select>
-              </label>
-              <label className="field">
-                <span>AUW (grams)</span>
-                <input name="auw_grams" type="number" placeholder="380" min="1" max="25000" />
-              </label>
-            </div>
-            <div className="two-col">
-              <label className="field">
-                <span>FC target</span>
-                <input name="fc_target" placeholder="SPEEDYBEEF405" />
-              </label>
-              <label className="field">
-                <span>Radio link</span>
-                <select name="radio_link" defaultValue="">
-                  <option value="">Unknown</option>
-                  <option value="ELRS 2.4GHz">ELRS 2.4 GHz</option>
-                  <option value="ELRS 900MHz">ELRS 900 MHz</option>
-                  <option value="TBS Crossfire">TBS Crossfire</option>
-                  <option value="TBS Tracer">TBS Tracer</option>
-                  <option value="FrSky D16">FrSky D16</option>
-                  <option value="FrSky ACCST">FrSky ACCST</option>
-                  <option value="Spektrum">Spektrum</option>
-                  <option value="Other">Other</option>
-                </select>
-              </label>
-            </div>
-            <label className="field">
-              <span>Video system</span>
-              <select name="video_system" defaultValue="">
-                <option value="">Unknown</option>
-                <option value="Analog">Analog</option>
-                <option value="DJI O3">DJI O3</option>
-                <option value="DJI O4">DJI O4</option>
-                <option value="Avatar HD">Avatar HD (Walksnail)</option>
-                <option value="HDZero">HDZero</option>
-                <option value="Walksnail">Walksnail</option>
-              </select>
-            </label>
-            <details>
-              <summary style={{cursor:'pointer',color:'var(--muted)',fontSize:'0.88rem',marginBottom:'6px'}}>EU/EASA regulatory fields</summary>
-              <div className="two-col" style={{marginTop:'8px'}}>
+              <div className="two-col">
+                <label className="field"><span>Frame</span><input name="frame" placeholder="5 inch freestyle" defaultValue={createBasicData['frame'] ?? ''} /></label>
+                <label className="field"><span>Stack</span><input name="stack" placeholder="F7 55A" defaultValue={createBasicData['stack'] ?? ''} /></label>
+                <label className="field"><span>Motors</span><input name="motors" placeholder="2207 1960KV" defaultValue={createBasicData['motors'] ?? ''} /></label>
+                <label className="field"><span>Props</span><input name="props" placeholder="5.1x3.6x3" defaultValue={createBasicData['props'] ?? ''} /></label>
+              </div>
+              <div className="two-col">
                 <label className="field">
-                  <span>Operator ID</span>
-                  <input name="operator_id" placeholder="POL-1234567" />
+                  <span>Status</span>
+                  <select name="status" defaultValue={createBasicData['status'] ?? 'flyable'}>
+                    <option value="flyable">Flyable</option>
+                    <option value="needs_repair">Needs repair</option>
+                    <option value="grounded_crash">Crashed / grounded</option>
+                    <option value="in_build">In build</option>
+                    <option value="retired">Retired</option>
+                    <option value="for_parts">For parts</option>
+                  </select>
                 </label>
+                <label className="field"><span>AUW (grams)</span><input name="auw_grams" type="number" placeholder="380" min="1" max="25000" defaultValue={createBasicData['auw_grams'] ?? ''} /></label>
+              </div>
+              <div className="two-col">
+                <label className="field"><span>FC target</span><input name="fc_target" placeholder="SPEEDYBEEF405" defaultValue={createBasicData['fc_target'] ?? ''} /></label>
                 <label className="field">
-                  <span>Country</span>
-                  <input name="registration_country" placeholder="PL" maxLength={3} />
-                </label>
-                <label className="field">
-                  <span>Registration expiry</span>
-                  <input name="registration_expiry" type="date" />
-                </label>
-                <label className="field">
-                  <span>Remote ID module</span>
-                  <input name="remote_id_module" placeholder="Dronetag Mini" />
+                  <span>Radio link</span>
+                  <select name="radio_link" defaultValue={createBasicData['radio_link'] ?? ''}>
+                    <option value="">Unknown</option>
+                    <option value="ELRS 2.4GHz">ELRS 2.4 GHz</option>
+                    <option value="ELRS 900MHz">ELRS 900 MHz</option>
+                    <option value="TBS Crossfire">TBS Crossfire</option>
+                    <option value="TBS Tracer">TBS Tracer</option>
+                    <option value="FrSky D16">FrSky D16</option>
+                    <option value="FrSky ACCST">FrSky ACCST</option>
+                    <option value="Spektrum">Spektrum</option>
+                    <option value="Other">Other</option>
+                  </select>
                 </label>
               </div>
-            </details>
-            <div className="two-col">
               <label className="field">
-                <span>Category</span>
-                <input name="category" placeholder="freestyle / cinematic / long-range" />
+                <span>Video system</span>
+                <select name="video_system" defaultValue={createBasicData['video_system'] ?? ''}>
+                  <option value="">Unknown</option>
+                  <option value="Analog">Analog</option>
+                  <option value="DJI O3">DJI O3</option>
+                  <option value="DJI O4">DJI O4</option>
+                  <option value="Avatar HD">Avatar HD (Walksnail)</option>
+                  <option value="HDZero">HDZero</option>
+                  <option value="Walksnail">Walksnail</option>
+                </select>
               </label>
-              <label className="field">
-                <span>Image URL (manufacturer photo)</span>
-                <input name="image_url" type="url" placeholder="https://…" />
-              </label>
-            </div>
-            <label className="field">
-              <span>Notes</span>
-              <textarea name="notes" placeholder="Build notes, receiver details, wiring changes..." />
-            </label>
-            <div className="actions">
-              <button className="button" type="submit">Create drone</button>
-              <button className="button ghost" type="button" onClick={() => setShowTemplates(!showTemplates)}>From template</button>
-            </div>
-            {showTemplates && (
-              <div className="edit-panel" style={{marginTop:'10px'}}>
-                {/* Header row */}
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
-                  <h4 style={{margin:0,fontSize:'0.9rem'}}>Quick-fill from brand template</h4>
-                  <button className="button ghost" type="button" style={{fontSize:'0.75rem',padding:'2px 8px'}}
-                    onClick={() => { setShowTemplates(false); setTemplateBrand(''); setTemplateSearch(''); }}>✕ Close</button>
+              <details>
+                <summary style={{cursor:'pointer',color:'var(--muted)',fontSize:'0.88rem',marginBottom:'6px'}}>EU/EASA regulatory fields</summary>
+                <div className="two-col" style={{marginTop:'8px'}}>
+                  <label className="field"><span>Operator ID</span><input name="operator_id" placeholder="POL-1234567" defaultValue={createBasicData['operator_id'] ?? ''} /></label>
+                  <label className="field"><span>Country</span><input name="registration_country" placeholder="PL" maxLength={3} defaultValue={createBasicData['registration_country'] ?? ''} /></label>
+                  <label className="field"><span>Registration expiry</span><input name="registration_expiry" type="date" defaultValue={createBasicData['registration_expiry'] ?? ''} /></label>
+                  <label className="field"><span>Remote ID module</span><input name="remote_id_module" placeholder="Dronetag Mini" defaultValue={createBasicData['remote_id_module'] ?? ''} /></label>
                 </div>
-                {/* Brand tabs */}
-                <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'8px'}}>
-                  {['', 'iFlight', 'GEPRC', 'Flywoo', 'DeepSpaceFPV'].map(b => (
-                    <button key={b || 'all'} type="button"
-                      className={`button ghost${templateBrand === b ? ' active' : ''}`}
-                      style={{fontSize:'0.75rem',padding:'3px 10px'}}
-                      onClick={() => setTemplateBrand(b)}>
-                      {b || 'All brands'}
+              </details>
+              <div className="two-col">
+                <label className="field"><span>Category</span><input name="category" placeholder="freestyle / cinematic / long-range" defaultValue={createBasicData['category'] ?? ''} /></label>
+                <label className="field"><span>Image URL (manufacturer photo)</span><input name="image_url" type="text" placeholder="https://… or /api/proxy-image?..." defaultValue={createBasicData['image_url'] ?? ''} /></label>
+              </div>
+              <label className="field"><span>Notes</span><textarea name="notes" placeholder="Build notes, receiver details, wiring changes..." defaultValue={createBasicData['notes'] ?? ''} /></label>
+              <div className="actions">
+                <button className="button" type="submit">Next: Hardware →</button>
+                <button className="button ghost" type="button" onClick={() => setShowTemplates(!showTemplates)}>From template</button>
+              </div>
+              {showTemplates && (
+                <div className="edit-panel" style={{marginTop:'10px'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+                    <h4 style={{margin:0,fontSize:'0.9rem'}}>Quick-fill from brand template</h4>
+                    <button className="button ghost" type="button" style={{fontSize:'0.75rem',padding:'2px 8px'}}
+                      onClick={() => { setShowTemplates(false); setTemplateBrand(''); setTemplateSearch(''); }}>✕ Close</button>
+                  </div>
+                  <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'8px'}}>
+                    {['', 'iFlight', 'GEPRC', 'Flywoo', 'DeepSpaceFPV'].map(b => (
+                      <button key={b || 'all'} type="button"
+                        className={`button ghost${templateBrand === b ? ' active' : ''}`}
+                        style={{fontSize:'0.75rem',padding:'3px 10px'}}
+                        onClick={() => setTemplateBrand(b)}>
+                        {b || 'All brands'}
+                      </button>
+                    ))}
+                  </div>
+                  <input type="text" placeholder="Search model…" value={templateSearch}
+                    onChange={e => setTemplateSearch(e.target.value)}
+                    style={{width:'100%',marginBottom:'10px',padding:'5px 9px',borderRadius:'6px',
+                      border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',
+                      fontSize:'0.82rem',boxSizing:'border-box'}} />
+                  {(() => {
+                    const filtered = DRONE_TEMPLATES.filter(t =>
+                      (!templateBrand || t.brand === templateBrand) &&
+                      (!templateSearch || t.model.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                        t.category.toLowerCase().includes(templateSearch.toLowerCase()))
+                    );
+                    return (
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px',maxHeight:'340px',overflowY:'auto',paddingRight:'2px'}}>
+                        {filtered.map(tpl => (
+                          <button key={`${tpl.brand}-${tpl.model}`} type="button" onClick={() => applyTemplate(tpl)}
+                            style={{textAlign:'left',padding:'9px 11px',borderRadius:'8px',
+                              border:'1px solid var(--border)',background:'var(--surface2)',
+                              cursor:'pointer',display:'flex',flexDirection:'column',gap:'3px'}}>
+                            <div style={{fontSize:'0.68rem',color:'var(--accent)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>{tpl.brand}</div>
+                            <div style={{fontSize:'0.84rem',fontWeight:600,color:'var(--text)',lineHeight:1.25}}>{tpl.model}</div>
+                            <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginTop:'2px'}}>
+                              <span style={{fontSize:'0.67rem',padding:'1px 5px',borderRadius:'4px',background:'rgba(255,255,255,0.07)',color:'var(--text-muted)'}}>{tpl.frame}</span>
+                              {tpl.auw_grams && <span style={{fontSize:'0.67rem',padding:'1px 5px',borderRadius:'4px',background:'rgba(255,255,255,0.07)',color:'var(--text-muted)'}}>{tpl.auw_grams}g</span>}
+                              {tpl.video_system && <span style={{fontSize:'0.67rem',padding:'1px 5px',borderRadius:'4px',background:'rgba(96,160,240,0.13)',color:'#60a0f0'}}>{tpl.video_system}</span>}
+                            </div>
+                          </button>
+                        ))}
+                        {filtered.length === 0 && (
+                          <div style={{gridColumn:'1/-1',textAlign:'center',color:'var(--text-muted)',padding:'24px',fontSize:'0.85rem'}}>
+                            No templates match.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </form>
+          )}
+
+          {createStep === 2 && (
+            <div className="stack">
+              <div style={{display:'flex',gap:'6px',flexWrap:'wrap',alignItems:'center'}}>
+                <input type="text" placeholder="Search parts…" value={catFilter.search}
+                  onChange={e => setCatFilter(f => ({...f, search: e.target.value}))}
+                  style={{flex:1,minWidth:120,padding:'5px 9px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
+                <select value={catFilter.mfr} onChange={e => setCatFilter(f => ({...f, mfr: e.target.value}))}
+                  style={{padding:'5px 8px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}}>
+                  <option value="">All brands</option>
+                  {manufacturers.map(m => <option key={m.id} value={String(m.id)}>{m.name}</option>)}
+                </select>
+                <select value={catFilter.role} onChange={e => setCatFilter(f => ({...f, role: e.target.value}))}
+                  style={{padding:'5px 8px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}}>
+                  <option value="">All roles</option>
+                  {ALL_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                </select>
+              </div>
+              {!catLoaded ? (
+                <div style={{color:'var(--text-muted)',fontSize:'0.85rem',padding:'16px 0'}}>Loading catalogue…</div>
+              ) : catalogue.length === 0 ? (
+                <div style={{color:'var(--text-muted)',fontSize:'0.85rem',padding:'8px 0'}}>
+                  No products in catalogue yet. Use the custom part form below, or add products via API first.
+                </div>
+              ) : (
+                <div style={{maxHeight:240,overflowY:'auto',border:'1px solid var(--border)',borderRadius:'8px',padding:'6px'}}>
+                  {catalogue
+                    .filter(p => (!catFilter.role || p.component_role === catFilter.role) && (!catFilter.mfr || String(p.manufacturer?.id) === catFilter.mfr) && (!catFilter.search || p.name.toLowerCase().includes(catFilter.search.toLowerCase())))
+                    .map(p => (
+                      <div key={p.id} onClick={() => { setSelectedCatProduct(p); setSelectedVariantId(null); setAddingRole(p.component_role as ComponentRole); }}
+                        style={{padding:'7px 10px',borderRadius:'6px',cursor:'pointer',marginBottom:'3px',border:`1px solid ${selectedCatProduct?.id === p.id ? 'var(--accent)' : 'transparent'}`,background: selectedCatProduct?.id === p.id ? 'rgba(96,160,240,0.08)' : 'transparent'}}>
+                        <div style={{fontSize:'0.82rem',fontWeight:600,color:'var(--text)'}}>{p.name}</div>
+                        <div style={{fontSize:'0.72rem',color:'var(--text-muted)'}}>{p.manufacturer?.name} {ROLE_LABELS[p.component_role as ComponentRole] ?? p.component_role}</div>
+                      </div>
+                    ))}
+                </div>
+              )}
+              {selectedCatProduct && (
+                <div style={{border:'1px solid var(--accent)',borderRadius:'8px',padding:'10px',background:'rgba(96,160,240,0.05)'}}>
+                  <div style={{fontWeight:600,fontSize:'0.88rem',marginBottom:'6px'}}>{selectedCatProduct.name}</div>
+                  {selectedCatProduct.variants.length > 0 && (
+                    <div style={{marginBottom:'8px'}}>
+                      <div style={{fontSize:'0.75rem',color:'var(--text-muted)',marginBottom:'4px'}}>Variant:</div>
+                      <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
+                        {selectedCatProduct.variants.map(v => (
+                          <button key={v.id} type="button"
+                            className={`button ghost${selectedVariantId === v.id ? ' active' : ''}`}
+                            style={{fontSize:'0.73rem',padding:'2px 8px'}}
+                            onClick={() => setSelectedVariantId(v.id)}>
+                            {v.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{display:'flex',gap:'6px',alignItems:'center',flexWrap:'wrap'}}>
+                    <label style={{fontSize:'0.75rem',color:'var(--text-muted)'}}>Role:</label>
+                    <select value={addingRole ?? selectedCatProduct.component_role}
+                      onChange={e => setAddingRole(e.target.value as ComponentRole)}
+                      style={{padding:'3px 6px',borderRadius:'5px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.78rem'}}>
+                      {ALL_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                    </select>
+                    <label style={{fontSize:'0.75rem',color:'var(--text-muted)'}}>Qty:</label>
+                    <input type="number" min={1} max={20} id="cat-qty-input"
+                      defaultValue={ROLE_DEFAULT_QTY[addingRole ?? selectedCatProduct.component_role as ComponentRole] ?? 1}
+                      style={{width:48,padding:'3px 5px',borderRadius:'5px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.78rem'}} />
+                    <button className="button" type="button" style={{fontSize:'0.78rem',padding:'4px 12px'}}
+                      onClick={() => {
+                        const qtyEl = document.getElementById('cat-qty-input') as HTMLInputElement;
+                        const qty = parseInt(qtyEl?.value || '1', 10);
+                        addPendingComponent(selectedCatProduct, selectedVariantId, addingRole ?? selectedCatProduct.component_role as ComponentRole, qty);
+                        setSelectedCatProduct(null);
+                        setSelectedVariantId(null);
+                      }}>
+                      + Add
                     </button>
+                  </div>
+                </div>
+              )}
+              <div style={{borderTop:'1px solid var(--border)',paddingTop:'10px'}}>
+                <button className="button ghost" type="button" style={{fontSize:'0.8rem',marginBottom:'8px'}} onClick={() => setAddingCustom(v => !v)}>
+                  {addingCustom ? '▲ Cancel custom part' : '+ Add custom / unlisted part'}
+                </button>
+                {addingCustom && (
+                  <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                    <div style={{display:'flex',gap:'6px'}}>
+                      <select value={customRole} onChange={e => setCustomRole(e.target.value as ComponentRole)}
+                        style={{flex:1,padding:'5px 8px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}}>
+                        {ALL_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                      </select>
+                      <input type="number" min={1} max={20} value={customQty} onChange={e => setCustomQty(Number(e.target.value))}
+                        style={{width:52,padding:'5px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
+                    </div>
+                    <input placeholder="Part name *" value={customName} onChange={e => setCustomName(e.target.value)}
+                      style={{padding:'5px 9px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
+                    <input placeholder="Manufacturer (optional)" value={customMfr} onChange={e => setCustomMfr(e.target.value)}
+                      style={{padding:'5px 9px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
+                    <input placeholder="Notes (optional)" value={customNotes} onChange={e => setCustomNotes(e.target.value)}
+                      style={{padding:'5px 9px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
+                    <button className="button" type="button" style={{alignSelf:'flex-start'}} disabled={!customName.trim()}
+                      onClick={() => {
+                        if (!customName.trim()) return;
+                        addPendingComponent(null, null, customRole, customQty, customName.trim(), customMfr.trim() || undefined, customNotes.trim() || undefined);
+                        setCustomName('');
+                        setCustomMfr('');
+                        setCustomNotes('');
+                        setAddingCustom(false);
+                      }}>
+                      + Add custom part
+                    </button>
+                  </div>
+                )}
+              </div>
+              {pendingComponents.length > 0 && (
+                <div style={{border:'1px solid var(--border)',borderRadius:'8px',padding:'10px'}}>
+                  <div style={{fontSize:'0.8rem',fontWeight:700,color:'var(--text-muted)',marginBottom:'8px'}}>SELECTED PARTS ({pendingComponents.length})</div>
+                  {pendingComponents.map(c => (
+                    <div key={c._key} style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'5px',padding:'5px 7px',borderRadius:'5px',background:'var(--surface2)'}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:'0.8rem',fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.display_name}</div>
+                        <div style={{fontSize:'0.7rem',color:'var(--text-muted)'}}>
+                          {ROLE_LABELS[c.component_role]} · qty {c.quantity}
+                          {c.display_mfr && ` · ${c.display_mfr}`}
+                        </div>
+                      </div>
+                      <input type="number" min={1} max={20} value={c.quantity}
+                        onChange={e => setPendingComponents(prev => prev.map(x => x._key === c._key ? {...x, quantity: Number(e.target.value)} : x))}
+                        style={{width:42,padding:'2px 4px',borderRadius:'4px',border:'1px solid var(--border)',background:'var(--surface)',color:'var(--text)',fontSize:'0.78rem'}} />
+                      <button type="button" style={{background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer',fontSize:'0.9rem',padding:'0 2px'}} onClick={() => removePendingComponent(c._key)}>✕</button>
+                    </div>
                   ))}
                 </div>
-                {/* Search */}
-                <input
-                  type="text"
-                  placeholder="Search model…"
-                  value={templateSearch}
-                  onChange={e => setTemplateSearch(e.target.value)}
-                  style={{width:'100%',marginBottom:'10px',padding:'5px 9px',borderRadius:'6px',
-                    border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',
-                    fontSize:'0.82rem',boxSizing:'border-box'}}
-                />
-                {/* Card grid */}
-                {(() => {
-                  const filtered = DRONE_TEMPLATES.filter(t =>
-                    (!templateBrand || t.brand === templateBrand) &&
-                    (!templateSearch || t.model.toLowerCase().includes(templateSearch.toLowerCase()) ||
-                      t.category.toLowerCase().includes(templateSearch.toLowerCase()))
-                  );
-                  return (
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px',maxHeight:'340px',overflowY:'auto',paddingRight:'2px'}}>
-                      {filtered.map(tpl => (
-                        <button key={`${tpl.brand}-${tpl.model}`} type="button" onClick={() => applyTemplate(tpl)}
-                          style={{textAlign:'left',padding:'9px 11px',borderRadius:'8px',
-                            border:'1px solid var(--border)',background:'var(--surface2)',
-                            cursor:'pointer',display:'flex',flexDirection:'column',gap:'3px'}}>
-                          <div style={{fontSize:'0.68rem',color:'var(--accent)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>{tpl.brand}</div>
-                          <div style={{fontSize:'0.84rem',fontWeight:600,color:'var(--text)',lineHeight:1.25}}>{tpl.model}</div>
-                          <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginTop:'2px'}}>
-                            <span style={{fontSize:'0.67rem',padding:'1px 5px',borderRadius:'4px',background:'rgba(255,255,255,0.07)',color:'var(--text-muted)'}}>{tpl.frame}</span>
-                            {tpl.auw_grams && <span style={{fontSize:'0.67rem',padding:'1px 5px',borderRadius:'4px',background:'rgba(255,255,255,0.07)',color:'var(--text-muted)'}}>{tpl.auw_grams}g</span>}
-                            {tpl.video_system && <span style={{fontSize:'0.67rem',padding:'1px 5px',borderRadius:'4px',background:'rgba(96,160,240,0.13)',color:'#60a0f0'}}>{tpl.video_system}</span>}
-                          </div>
-                        </button>
-                      ))}
-                      {filtered.length === 0 && (
-                        <div style={{gridColumn:'1/-1',textAlign:'center',color:'var(--text-muted)',padding:'24px',fontSize:'0.85rem'}}>
-                          No templates match.
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+              )}
+              <div className="actions" style={{marginTop:'8px'}}>
+                <button className="button ghost" type="button" onClick={() => setCreateStep(1)}>← Back</button>
+                <button className="button" type="button" onClick={() => setCreateStep(3)}>Review →</button>
               </div>
-            )}
-          </form>
+            </div>
+          )}
+
+          {createStep === 3 && (
+            <form className="stack" onSubmit={(event) => void handleCreateDrone(event)}>
+              <div style={{border:'1px solid var(--border)',borderRadius:'8px',padding:'12px',marginBottom:'4px'}}>
+                <div style={{fontSize:'0.78rem',fontWeight:700,color:'var(--text-muted)',marginBottom:'8px',letterSpacing:'0.05em'}}>DRONE SUMMARY</div>
+                <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'3px 10px',fontSize:'0.83rem'}}>
+                  {[
+                    ['Name', createBasicData['name']],
+                    ['Status', createBasicData['status'] ?? 'flyable'],
+                    ['Frame', createBasicData['frame']],
+                    ['Stack', createBasicData['stack']],
+                    ['Motors', createBasicData['motors']],
+                    ['Video', createBasicData['video_system']],
+                    ['Radio', createBasicData['radio_link']],
+                    ['AUW', createBasicData['auw_grams'] ? `${createBasicData['auw_grams']} g` : null],
+                    ['Category', createBasicData['category']],
+                  ].filter(([, v]) => v).map(([k, v]) => (
+                    <Fragment key={String(k)}>
+                      <span style={{color:'var(--text-muted)',fontWeight:600}}>{k}:</span>
+                      <span>{String(v)}</span>
+                    </Fragment>
+                  ))}
+                </div>
+              </div>
+              {pendingComponents.length > 0 ? (
+                <div style={{border:'1px solid var(--border)',borderRadius:'8px',padding:'12px'}}>
+                  <div style={{fontSize:'0.78rem',fontWeight:700,color:'var(--text-muted)',marginBottom:'8px',letterSpacing:'0.05em'}}>HARDWARE BUILD ({pendingComponents.length} parts)</div>
+                  {pendingComponents.map(c => (
+                    <div key={c._key} style={{fontSize:'0.82rem',marginBottom:'4px',display:'flex',gap:'8px'}}>
+                      <span style={{color:'var(--text-muted)',minWidth:120}}>{ROLE_LABELS[c.component_role]}</span>
+                      <span style={{fontWeight:600}}>{c.display_name}</span>
+                      {c.quantity > 1 && <span style={{color:'var(--text-muted)'}}>×{c.quantity}</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{fontSize:'0.82rem',color:'var(--text-muted)',padding:'6px 0'}}>No hardware parts selected. Drone will be created without a build configuration.</div>
+              )}
+              <div className="actions">
+                <button className="button ghost" type="button" onClick={() => setCreateStep(2)}>← Back to Parts</button>
+                <button className="button" type="submit">✓ Create drone</button>
+                <button className="button ghost" type="button" style={{marginLeft:'auto'}} onClick={resetWizard}>Cancel</button>
+              </div>
+            </form>
+          )}
         </article>
 
         <article className="panel span-8">
@@ -901,15 +1358,10 @@ export default function HomePage() {
                   }
                 }}
               >
-                {/* ── Compact header (always visible) ── */}
                 <div style={{display:'flex',gap:'12px',alignItems:'flex-start'}}>
-                  {/* Thumbnail */}
-                  <div style={{flexShrink:0,width:'72px',height:'54px',borderRadius:'6px',overflow:'hidden',
-                    background:'linear-gradient(135deg,var(--surface2) 0%,rgba(255,255,255,0.04) 100%)',
-                    display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid var(--border)'}}>
+                  <div style={{flexShrink:0,width:'72px',height:'54px',borderRadius:'6px',overflow:'hidden',background:'linear-gradient(135deg,var(--surface2) 0%,rgba(255,255,255,0.04) 100%)',display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid var(--border)'}}>
                     {drone.image_url
-                      ? <img src={drone.image_url} alt={drone.name} style={{width:'100%',height:'100%',objectFit:'cover'}}
-                          onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}}/>
+                      ? <img src={drone.image_url} alt={drone.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e)=>{(e.target as HTMLImageElement).style.display='none';}}/>
                       : <span style={{fontSize:'1.3rem',opacity:0.3}}>🚁</span>}
                   </div>
                   <div style={{flex:1,minWidth:0}}>
@@ -921,43 +1373,29 @@ export default function HomePage() {
                     <div className="badge-row" style={{marginTop:'4px'}}>
                       <span className="badge" style={{background:sm.bg,color:sm.color}}>{sm.label}</span>
                       {drone.auw_grams ? <span className="badge">{drone.auw_grams}g</span> : null}
-                      {drone.video_system ? <span className="badge">{drone.video_system}</span> : null}
-                      {drone.radio_link ? <span className="badge">{drone.radio_link}</span> : null}
                     </div>
                   </div>
                 </div>
-
-                {/* ── Full spec card (expanded when selected) ── */}
                 {drone.id === selectedDroneId && (
                   <div style={{marginTop:'14px',paddingTop:'14px',borderTop:'1px solid var(--border)'}} onClick={e=>e.stopPropagation()}>
                     <div style={{display:'flex',gap:'16px',alignItems:'flex-start'}}>
-                      {/* Manufacturer photo */}
                       <div style={{flexShrink:0,width:'200px'}}>
                         {drone.image_url
                           ? <img src={drone.image_url} alt={drone.name}
                               style={{width:'200px',height:'150px',objectFit:'cover',borderRadius:'8px',border:'1px solid var(--border)',display:'block'}}
                               onError={(e)=>{(e.target as HTMLImageElement).parentElement!.innerHTML='<div style="width:200px;height:150px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:3rem;opacity:0.3">🚁</div>';}}/>
-                          : <div style={{width:'200px',height:'150px',borderRadius:'8px',border:'1px solid var(--border)',
-                              background:'var(--surface2)',display:'flex',flexDirection:'column',alignItems:'center',
-                              justifyContent:'center',gap:'6px',color:'var(--text-muted)'}}>
+                          : <div style={{width:'200px',height:'150px',borderRadius:'8px',border:'1px solid var(--border)',background:'var(--surface2)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'6px',color:'var(--text-muted)'}}>
                               <span style={{fontSize:'2.5rem',opacity:0.3}}>🚁</span>
                               <span style={{fontSize:'0.72rem'}}>No image</span>
                             </div>}
                       </div>
-                      {/* Spec table */}
                       <div style={{flex:1,minWidth:0}}>
                         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.82rem'}}>
                           <tbody>
                             {[
-                              ['Frame',       drone.frame],
-                              ['Stack',       drone.stack],
-                              ['Motors',      drone.motors],
-                              ['Props',       drone.props],
-                              ['Video',       drone.video_system],
-                              ['Radio',       drone.radio_link],
-                              ['FC target',   drone.fc_target],
-                              ['AUW',         drone.auw_grams ? `${drone.auw_grams} g` : null],
-                              ['Category',    drone.category],
+                              ['Frame', drone.frame], ['Stack', drone.stack], ['Motors', drone.motors], ['Props', drone.props],
+                              ['Video', drone.video_system], ['Radio', drone.radio_link], ['FC target', drone.fc_target],
+                              ['AUW', drone.auw_grams ? `${drone.auw_grams} g` : null], ['Category', drone.category],
                             ].filter(([,v]) => v).map(([label, value]) => (
                               <tr key={label as string} style={{borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
                                 <td style={{padding:'4px 10px 4px 0',color:'var(--text-muted)',whiteSpace:'nowrap',width:'80px'}}>{label}</td>
@@ -967,6 +1405,25 @@ export default function HomePage() {
                           </tbody>
                         </table>
                         {drone.notes && <p style={{margin:'8px 0 0',fontSize:'0.81rem',color:'var(--text-muted)',lineHeight:1.5}}>{drone.notes}</p>}
+                        {drone.current_hardware && drone.current_hardware.length > 0 && (
+                          <div style={{marginTop:'12px'}}>
+                            <div style={{fontSize:'0.75rem',fontWeight:700,color:'var(--text-muted)',marginBottom:'6px',letterSpacing:'0.05em'}}>CURRENT HARDWARE</div>
+                            <table style={{width:'100%',fontSize:'0.78rem',borderCollapse:'collapse'}}>
+                              <tbody>
+                                {drone.current_hardware.map(c => (
+                                  <tr key={c.id} style={{borderBottom:'1px solid var(--border)'}}>
+                                    <td style={{padding:'3px 6px',color:'var(--text-muted)',whiteSpace:'nowrap'}}>{ROLE_LABELS[c.component_role as ComponentRole] ?? c.component_role}</td>
+                                    <td style={{padding:'3px 6px',fontWeight:600}}>
+                                      {c.product ? `${c.product.manufacturer?.name ? c.product.manufacturer.name + ' ' : ''}${c.product.name}` : c.custom_name}
+                                      {c.product_variant && ` (${c.product_variant.name})`}
+                                    </td>
+                                    <td style={{padding:'3px 6px',color:'var(--text-muted)'}}>{c.quantity > 1 ? `×${c.quantity}` : ''}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'10px',paddingTop:'8px',borderTop:'1px solid var(--border)'}}>
@@ -1113,298 +1570,370 @@ export default function HomePage() {
           </div>
         </article>
       </section>
+      )}
 
-      {selectedDrone ? (
-        <section className="content-grid">
-          <article className="panel span-4">
-            <h3>Create snapshot</h3>
-            <form className="stack" onSubmit={(event) => void handleCreateSnapshot(event)}>
-              <label className="field">
-                <span>Snapshot name</span>
-                <input name="name" placeholder="2026-05-08 known-good" required />
-              </label>
-              <label className="field">
-                <span>Betaflight version</span>
-                <input name="betaflight_version" placeholder="4.5.2" />
-              </label>
-              <label className="field">
-                <span>Notes</span>
-                <textarea name="notes" placeholder="What changed in this snapshot?" />
-              </label>
-              <button className="button secondary" type="submit">Create snapshot</button>
-            </form>
-          </article>
-
-          <article className="panel span-8">
-            <h3>Upload dump, diff all, or raw CLI</h3>
-            <form className="stack" onSubmit={(event) => void handleUpload(event)}>
-              <div className="two-col">
-                <label className="field">
-                  <span>Target snapshot</span>
-                  <select name="snapshotId" defaultValue="">
-                    <option value="">Create or use without snapshot</option>
-                    {selectedDrone.snapshots.map((snapshot) => (
-                      <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Or create snapshot on upload</span>
-                  <input name="snapshotName" placeholder="2026-05-08 post-repair" />
-                </label>
-              </div>
-              <label className="field">
-                <span>Paste raw CLI text (paste-first: just paste and upload)</span>
-                <textarea name="rawText" placeholder="Paste dump / diff all output here. No file needed — just paste and click Upload." />
-              </label>
-              <div className="two-col">
-                <label className="field">
-                  <span>Export type</span>
-                  <select name="exportType" defaultValue="dump">
-                    <option value="dump">dump</option>
-                    <option value="diff_all">diff_all</option>
-                    <option value="status">status</option>
-                    <option value="version">version</option>
-                    <option value="photo">photo</option>
-                    <option value="blackbox">blackbox</option>
-                    <option value="misc">misc</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Or upload a file</span>
-                  <input name="file" type="file" />
-                </label>
-              </div>
-              <div className="actions">
-                <button className="button" type="submit">Upload</button>
-              </div>
-            </form>
-          </article>
-
-          <article className="panel span-5">
-            <h3>Snapshots</h3>
-            <div className="snapshot-list">
-              {selectedDrone.snapshots.map((snapshot) => (
-                <div key={snapshot.id} className={`card ${snapshot.id === selectedSnapshotId ? 'active' : ''}`}>
-                  <div className="meta">
-                    <strong>{snapshot.name}</strong>
-                    <span>{snapshot.betaflight_version || 'BF version unknown'}</span>
-                  </div>
-                  <div className="badge-row">
-                    {snapshot.is_current ? <span className="badge warm">Current</span> : null}
-                    {snapshot.is_known_good ? <span className="badge ok">Known-good</span> : null}
-                    <span className="badge">Files: {snapshot.files.length}</span>
-                    {(() => {
-                      const currentSnap = selectedDrone.snapshots.find((s) => s.is_current);
-                      if (currentSnap && currentSnap.id !== snapshot.id && snapshot.betaflight_version && currentSnap.betaflight_version && snapshot.betaflight_version !== currentSnap.betaflight_version) {
-                        return <span className="badge danger">BF version mismatch ({snapshot.betaflight_version} vs {currentSnap.betaflight_version})</span>;
-                      }
-                      return null;
-                    })()}
-                  </div>
-                  <p style={{margin:'4px 0 6px',fontSize:'0.85rem'}}>{snapshot.notes || 'No snapshot notes.'}</p>
-                  <small style={{color:'var(--muted)',fontSize:'0.78rem'}}>{formatDate(snapshot.created_at)}</small>
-                  <div className="actions" style={{marginTop:'8px'}}>
-                    <button className="button ghost" type="button" onClick={() => void openRawSnapshot(snapshot.id, snapshot.name)}>View raw</button>
-                    <button className="button ghost" type="button" onClick={() => void markSnapshot(snapshot.id, 'current')}>Mark current</button>
-                    <button className="button ghost" type="button" onClick={() => void markSnapshot(snapshot.id, 'known-good')}>Known-good</button>
-                    <button className="button ghost" type="button" onClick={() => setEditSnapshotId(editSnapshotId === snapshot.id ? null : snapshot.id)}>Edit</button>
-                    <button className="button danger" type="button" style={{padding:'4px 10px',fontSize:'0.78rem',marginLeft:'auto'}} onClick={() => void handleDeleteSnapshot(snapshot)}>Delete</button>
-                  </div>
-                  {editSnapshotId === snapshot.id && (
-                    <form className="stack" style={{marginTop:'8px',padding:'8px',background:'var(--bg)',borderRadius:'6px'}} onSubmit={(e) => void handleUpdateSnapshot(e, snapshot.id, selectedDroneId!)}>
-                      <label className="field">
-                        <span style={{fontSize:'0.82rem'}}>Name</span>
-                        <input name="name" defaultValue={snapshot.name} required style={{fontSize:'0.85rem'}} />
-                      </label>
-                      <label className="field">
-                        <span style={{fontSize:'0.82rem'}}>BF version</span>
-                        <input name="betaflight_version" defaultValue={snapshot.betaflight_version ?? ''} placeholder="4.5.2" style={{fontSize:'0.85rem'}} />
-                      </label>
-                      <label className="field">
-                        <span style={{fontSize:'0.82rem'}}>Notes</span>
-                        <textarea name="notes" defaultValue={snapshot.notes ?? ''} style={{fontSize:'0.85rem'}} />
-                      </label>
-                      <div className="actions">
-                        <button className="button" type="submit" style={{fontSize:'0.82rem',padding:'4px 10px'}}>Save</button>
-                        <button className="button ghost" type="button" style={{fontSize:'0.82rem',padding:'4px 10px'}} onClick={() => setEditSnapshotId(null)}>Cancel</button>
-                      </div>
-                    </form>
-                  )}
-                  <div className="file-list">
-                    {snapshot.files.map((file) => (
-                      <div key={file.id} className="card">
-                        <div className="meta">
-                          <strong>{file.original_filename || file.role}</strong>
-                          <span>{file.role}</span>
-                        </div>
-                        <div className="badge-row">
-                          <span className="badge">{file.size_bytes} bytes</span>
-                          <span className="badge">{file.parse_status}</span>
-                        </div>
-                        <div className="actions">
-                          <a className="button ghost" href={`${apiBase}/api/files/${file.id}/download`} target="_blank">Download</a>
-                          <button className="button danger" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => void handleDeleteFile(file)}>Delete</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+      {showDroneSections && selectedDrone ? (
+        <div className="drone-workspace">
+          {/* ── Drone workspace header + tabs ── */}
+          <div className="dw-header">
+            <div className="dw-title">
+              <span style={{fontSize:'1.1rem'}}>📍</span>
+              <strong>{selectedDrone.name}</strong>
+              <span className="badge" style={{background: STATUS_META[selectedDrone.status].bg, color: STATUS_META[selectedDrone.status].color}}>
+                {STATUS_META[selectedDrone.status].label}
+              </span>
+              {selectedDrone.auw_grams && <span className="badge">{selectedDrone.auw_grams}g</span>}
+            </div>
+            <div className="dw-tabs">
+              {([
+                ['snapshots', `Snapshots (${selectedDrone.snapshots.length})`],
+                ['flight-log', `Flight Log (${selectedDrone.flight_notes.length})`],
+                ['maintenance', `Maintenance (${selectedDrone.maintenance_events.length})`],
+                ['compare', 'Compare'],
+              ] as const).map(([tab, label]) => (
+                <button
+                  key={tab}
+                  className={`dw-tab${droneTab === tab ? ' active' : ''}`}
+                  type="button"
+                  onClick={() => setDroneTab(tab)}
+                >
+                  {label}
+                </button>
               ))}
             </div>
-          </article>
+          </div>
 
-          <article className="panel span-7">
-            <h3>Raw snapshot viewer</h3>
-            {selectedSnapshot ? <p>Active snapshot: <strong>{selectedSnapshot.name}</strong></p> : null}
-            {rawSnapshot?.files.length ? rawSnapshot.files.map((file) => (
-              <div key={file.file_id} className="stack">
-                <div className="badge-row" style={{justifyContent:'space-between'}}>
-                  <div className="badge-row">
-                    <span className="badge warm">{file.role}</span>
-                    <span className="badge">{file.original_filename || 'inline text'}</span>
+          {/* ── SNAPSHOTS TAB ── */}
+          {droneTab === 'snapshots' && (
+            <section className="content-grid">
+              <article className="panel span-4">
+                <h3>Create snapshot</h3>
+                <form className="stack" onSubmit={(event) => void handleCreateSnapshot(event)}>
+                  <label className="field">
+                    <span>Snapshot name</span>
+                    <input name="name" placeholder="2026-05-08 known-good" required />
+                  </label>
+                  <label className="field">
+                    <span>Betaflight version</span>
+                    <input name="betaflight_version" placeholder="4.5.2" />
+                  </label>
+                  <label className="field">
+                    <span>Notes</span>
+                    <textarea name="notes" placeholder="What changed in this snapshot?" />
+                  </label>
+                  <button className="button secondary" type="submit">Create snapshot</button>
+                </form>
+              </article>
+
+              <article className="panel span-8">
+                <h3>Upload dump, diff all, or raw CLI</h3>
+                <form className="stack" onSubmit={(event) => void handleUpload(event)}>
+                  <div className="two-col">
+                    <label className="field">
+                      <span>Target snapshot</span>
+                      <select name="snapshotId" defaultValue="">
+                        <option value="">Create or use without snapshot</option>
+                        {selectedDrone.snapshots.map((snapshot) => (
+                          <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Or create snapshot on upload</span>
+                      <input name="snapshotName" placeholder="2026-05-08 post-repair" />
+                    </label>
                   </div>
-                  <button
-                    className="button ghost"
-                    type="button"
-                    style={{padding:'4px 12px',fontSize:'0.82rem'}}
-                    onClick={() => void copyToClipboard(file.content)}
-                  >Copy</button>
-                </div>
-                {file.parsed_config && Object.keys(file.parsed_config).length > 0 && (
-                  <details style={{marginBottom:'6px'}}>
-                    <summary style={{cursor:'pointer',fontWeight:600,fontSize:'0.88rem',color:'var(--muted)'}}>
-                      Structured config ({Object.values(file.parsed_config).reduce((acc, s) => acc + s.length, 0)} settings)
-                    </summary>
-                    {Object.entries(file.parsed_config).map(([section, entries]) => (
-                      <details key={section} style={{marginLeft:'14px',marginTop:'4px'}}>
-                        <summary style={{cursor:'pointer',fontSize:'0.85rem',display:'flex',alignItems:'center',gap:'8px'}}>
-                          <span style={{textTransform:'capitalize'}}>{section}</span>
-                          <span style={{color:'var(--muted)'}}>({entries.length})</span>
-                          <button className="button ghost" type="button" style={{padding:'2px 8px',fontSize:'0.75rem',marginLeft:'auto'}} onClick={(e) => { e.preventDefault(); copySectionAsCLI(entries); }}>Copy {section}</button>
-                        </summary>
-                        <table style={{width:'100%',fontSize:'0.82rem',borderCollapse:'collapse',marginTop:'4px'}}>
-                          <tbody>
-                            {entries.map(({key, value}) => (
-                              <tr key={key} style={{borderBottom:'1px solid var(--border)'}}>
-                                <td style={{padding:'3px 8px',color:'var(--muted)',fontFamily:'monospace'}}>{key}</td>
-                                <td style={{padding:'3px 8px',fontWeight:600,fontFamily:'monospace'}}>{value}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </details>
-                    ))}
-                  </details>
+                  <label className="field">
+                    <span>Paste raw CLI text (paste-first: just paste and upload)</span>
+                    <textarea name="rawText" placeholder="Paste dump / diff all output here. No file needed — just paste and click Upload." />
+                  </label>
+                  <div className="two-col">
+                    <label className="field">
+                      <span>Export type</span>
+                      <select name="exportType" defaultValue="dump">
+                        <option value="dump">dump</option>
+                        <option value="diff_all">diff_all</option>
+                        <option value="status">status</option>
+                        <option value="version">version</option>
+                        <option value="photo">photo</option>
+                        <option value="blackbox">blackbox</option>
+                        <option value="misc">misc</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Or upload a file</span>
+                      <input name="file" type="file" />
+                    </label>
+                  </div>
+                  <div className="actions">
+                    <button className="button" type="submit">Upload</button>
+                  </div>
+                </form>
+              </article>
+
+              <article className="panel span-5">
+                <h3>Snapshot history</h3>
+                {selectedDrone.snapshots.length === 0 && (
+                  <p style={{color:'var(--text-muted)',fontSize:'0.88rem'}}>No snapshots yet. Create one above.</p>
                 )}
-                <pre className="code-box">{file.content}</pre>
-              </div>
-            )) : <p>No raw files attached to the selected snapshot.</p>}
-          </article>
-
-          <article className="panel span-4">
-            <h3>Add flight note</h3>
-            <form className="stack" onSubmit={(event) => void handleCreateNote(event, 'flights')}>
-              <label className="field">
-                <span>Title</span>
-                <input name="title" placeholder="First tuning pack" required />
-              </label>
-              <label className="field">
-                <span>Note</span>
-                <textarea name="note" placeholder="How did it fly?" required />
-              </label>
-              <button className="button secondary" type="submit">Add flight note</button>
-            </form>
-            <div className="note-list">
-              {selectedDrone.flight_notes.map((note) => (
-                <div key={note.id} className="card">
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                    <strong>{note.title}</strong>
-                    <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'flights')}>✕</button>
-                  </div>
-                  <p>{note.note}</p>
-                  <small>{formatDate(note.created_at)}</small>
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="panel span-4">
-            <h3>Add maintenance event</h3>
-            <form className="stack" onSubmit={(event) => void handleCreateNote(event, 'maintenance')}>
-              <label className="field">
-                <span>Title</span>
-                <input name="title" placeholder="Replaced front-left motor" required />
-              </label>
-              <label className="field">
-                <span>Note</span>
-                <textarea name="note" placeholder="What was changed and why?" required />
-              </label>
-              <button className="button secondary" type="submit">Add maintenance event</button>
-            </form>
-            <div className="note-list">
-              {selectedDrone.maintenance_events.map((note) => (
-                <div key={note.id} className="card">
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                    <strong>{note.title}</strong>
-                    <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'maintenance')}>✕</button>
-                  </div>
-                  <p>{note.note}</p>
-                  <small>{formatDate(note.created_at)}</small>
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="panel span-4">
-            <h3>Compare snapshots</h3>
-            <form className="stack" onSubmit={(event) => void handleCompare(event)}>
-              <label className="field">
-                <span>Left snapshot</span>
-                <select name="left_snapshot_id" defaultValue="">
-                  <option value="">Select snapshot</option>
+                <div className="snapshot-list">
                   {selectedDrone.snapshots.map((snapshot) => (
-                    <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
+                    <div key={snapshot.id} className={`card ${snapshot.id === selectedSnapshotId ? 'active' : ''}`}>
+                      <div className="meta">
+                        <strong>{snapshot.name}</strong>
+                        <span>{snapshot.betaflight_version || 'BF version unknown'}</span>
+                      </div>
+                      <div className="badge-row">
+                        {snapshot.is_current ? <span className="badge warm">Current</span> : null}
+                        {snapshot.is_known_good ? <span className="badge ok">Known-good</span> : null}
+                        <span className="badge">Files: {snapshot.files.length}</span>
+                        {(() => {
+                          const currentSnap = selectedDrone.snapshots.find((s) => s.is_current);
+                          if (currentSnap && currentSnap.id !== snapshot.id && snapshot.betaflight_version && currentSnap.betaflight_version && snapshot.betaflight_version !== currentSnap.betaflight_version) {
+                            return <span className="badge danger">BF version mismatch ({snapshot.betaflight_version} vs {currentSnap.betaflight_version})</span>;
+                          }
+                          return null;
+                        })()}
+                      </div>
+                      <p style={{margin:'4px 0 6px',fontSize:'0.85rem'}}>{snapshot.notes || 'No snapshot notes.'}</p>
+                      <small style={{color:'var(--muted)',fontSize:'0.78rem'}}>{formatDate(snapshot.created_at)}</small>
+                      <div className="actions" style={{marginTop:'8px'}}>
+                        <button className="button ghost" type="button" onClick={() => void openRawSnapshot(snapshot.id, snapshot.name)}>View raw</button>
+                        <button className="button ghost" type="button" onClick={() => void markSnapshot(snapshot.id, 'current')}>Mark current</button>
+                        <button className="button ghost" type="button" onClick={() => void markSnapshot(snapshot.id, 'known-good')}>Known-good</button>
+                        <button className="button ghost" type="button" onClick={() => setEditSnapshotId(editSnapshotId === snapshot.id ? null : snapshot.id)}>Edit</button>
+                        <button className="button danger" type="button" style={{padding:'4px 10px',fontSize:'0.78rem',marginLeft:'auto'}} onClick={() => void handleDeleteSnapshot(snapshot)}>Delete</button>
+                      </div>
+                      {editSnapshotId === snapshot.id && (
+                        <form className="stack" style={{marginTop:'8px',padding:'8px',background:'var(--bg)',borderRadius:'6px'}} onSubmit={(e) => void handleUpdateSnapshot(e, snapshot.id, selectedDroneId!)}>
+                          <label className="field">
+                            <span style={{fontSize:'0.82rem'}}>Name</span>
+                            <input name="name" defaultValue={snapshot.name} required style={{fontSize:'0.85rem'}} />
+                          </label>
+                          <label className="field">
+                            <span style={{fontSize:'0.82rem'}}>BF version</span>
+                            <input name="betaflight_version" defaultValue={snapshot.betaflight_version ?? ''} placeholder="4.5.2" style={{fontSize:'0.85rem'}} />
+                          </label>
+                          <label className="field">
+                            <span style={{fontSize:'0.82rem'}}>Notes</span>
+                            <textarea name="notes" defaultValue={snapshot.notes ?? ''} style={{fontSize:'0.85rem'}} />
+                          </label>
+                          <div className="actions">
+                            <button className="button" type="submit" style={{fontSize:'0.82rem',padding:'4px 10px'}}>Save</button>
+                            <button className="button ghost" type="button" style={{fontSize:'0.82rem',padding:'4px 10px'}} onClick={() => setEditSnapshotId(null)}>Cancel</button>
+                          </div>
+                        </form>
+                      )}
+                      <div className="file-list">
+                        {snapshot.files.map((file) => (
+                          <div key={file.id} className="card">
+                            <div className="meta">
+                              <strong>{file.original_filename || file.role}</strong>
+                              <span>{file.role}</span>
+                            </div>
+                            <div className="badge-row">
+                              <span className="badge">{file.size_bytes} bytes</span>
+                              <span className="badge">{file.parse_status}</span>
+                            </div>
+                            <div className="actions">
+                              <a className="button ghost" href={`${apiBase}/api/files/${file.id}/download`} target="_blank">Download</a>
+                              <button className="button danger" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => void handleDeleteFile(file)}>Delete</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>Right snapshot</span>
-                <select name="right_snapshot_id" defaultValue="">
-                  <option value="">Select snapshot</option>
-                  {selectedDrone.snapshots.map((snapshot) => (
-                    <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
-                  ))}
-                </select>
-              </label>
-              <button className="button" type="submit">Compare</button>
-            </form>
-            {compareResult ? (
-              <div className="stack">
-                <div className="badge-row">
-                  <span className="badge warm">Added: {compareResult.added_lines}</span>
-                  <span className="badge">Removed: {compareResult.removed_lines}</span>
                 </div>
-                {compareResult.diff ? (
-                  <pre className="code-box" style={{whiteSpace:'pre-wrap'}}>
-                    {compareResult.diff.split('\n').map((line, i) => {
-                      let cls = '';
-                      if (line.startsWith('+')) cls = 'diff-added';
-                      else if (line.startsWith('-')) cls = 'diff-removed';
-                      else if (line.startsWith('@@')) cls = 'diff-header';
-                      return <span key={i} className={cls || undefined}>{line + '\n'}</span>;
-                    })}
-                  </pre>
-                ) : <p>No textual diff between the snapshots.</p>}
-              </div>
-            ) : (
-              <p>No comparison run yet.</p>
-            )}
-          </article>
-        </section>
+              </article>
+
+              <article className="panel span-7">
+                <h3>Raw snapshot viewer</h3>
+                {selectedSnapshot ? <p>Active snapshot: <strong>{selectedSnapshot.name}</strong></p> : null}
+                {rawSnapshot?.files.length ? rawSnapshot.files.map((file) => (
+                  <div key={file.file_id} className="stack">
+                    <div className="badge-row" style={{justifyContent:'space-between'}}>
+                      <div className="badge-row">
+                        <span className="badge warm">{file.role}</span>
+                        <span className="badge">{file.original_filename || 'inline text'}</span>
+                      </div>
+                      <button
+                        className="button ghost"
+                        type="button"
+                        style={{padding:'4px 12px',fontSize:'0.82rem'}}
+                        onClick={() => void copyToClipboard(file.content)}
+                      >Copy</button>
+                    </div>
+                    {file.parsed_config && Object.keys(file.parsed_config).length > 0 && (
+                      <details style={{marginBottom:'6px'}}>
+                        <summary style={{cursor:'pointer',fontWeight:600,fontSize:'0.88rem',color:'var(--muted)'}}>
+                          Structured config ({Object.values(file.parsed_config).reduce((acc, s) => acc + s.length, 0)} settings)
+                        </summary>
+                        {Object.entries(file.parsed_config).map(([section, entries]) => (
+                          <details key={section} style={{marginLeft:'14px',marginTop:'4px'}}>
+                            <summary style={{cursor:'pointer',fontSize:'0.85rem',display:'flex',alignItems:'center',gap:'8px'}}>
+                              <span style={{textTransform:'capitalize'}}>{section}</span>
+                              <span style={{color:'var(--muted)'}}>({entries.length})</span>
+                              <button className="button ghost" type="button" style={{padding:'2px 8px',fontSize:'0.75rem',marginLeft:'auto'}} onClick={(e) => { e.preventDefault(); copySectionAsCLI(entries); }}>Copy {section}</button>
+                            </summary>
+                            <table style={{width:'100%',fontSize:'0.82rem',borderCollapse:'collapse',marginTop:'4px'}}>
+                              <tbody>
+                                {entries.map(({key, value}) => (
+                                  <tr key={key} style={{borderBottom:'1px solid var(--border)'}}>
+                                    <td style={{padding:'3px 8px',color:'var(--muted)',fontFamily:'monospace'}}>{key}</td>
+                                    <td style={{padding:'3px 8px',fontWeight:600,fontFamily:'monospace'}}>{value}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </details>
+                        ))}
+                      </details>
+                    )}
+                    <pre className="code-box">{file.content}</pre>
+                  </div>
+                )) : <p>No raw files attached to the selected snapshot.</p>}
+              </article>
+            </section>
+          )}
+
+          {/* ── FLIGHT LOG TAB ── */}
+          {droneTab === 'flight-log' && (
+            <section className="content-grid">
+              <article className="panel span-4">
+                <h3>Add flight note</h3>
+                <form className="stack" onSubmit={(event) => void handleCreateNote(event, 'flights')}>
+                  <label className="field">
+                    <span>Title</span>
+                    <input name="title" placeholder="First tuning pack" required />
+                  </label>
+                  <label className="field">
+                    <span>Note</span>
+                    <textarea name="note" placeholder="How did it fly?" required />
+                  </label>
+                  <button className="button secondary" type="submit">Add flight note</button>
+                </form>
+              </article>
+              <article className="panel span-8">
+                <h3>Flight history — {selectedDrone.name}</h3>
+                {selectedDrone.flight_notes.length === 0 && (
+                  <p style={{color:'var(--text-muted)',fontSize:'0.88rem'}}>No flight notes yet.</p>
+                )}
+                <div className="note-list">
+                  {selectedDrone.flight_notes.map((note) => (
+                    <div key={note.id} className="card">
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                        <strong>{note.title}</strong>
+                        <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'flights')}>✕</button>
+                      </div>
+                      <p>{note.note}</p>
+                      <small>{formatDate(note.created_at)}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </section>
+          )}
+
+          {/* ── MAINTENANCE TAB ── */}
+          {droneTab === 'maintenance' && (
+            <section className="content-grid">
+              <article className="panel span-4">
+                <h3>Add maintenance event</h3>
+                <form className="stack" onSubmit={(event) => void handleCreateNote(event, 'maintenance')}>
+                  <label className="field">
+                    <span>Title</span>
+                    <input name="title" placeholder="Replaced front-left motor" required />
+                  </label>
+                  <label className="field">
+                    <span>Note</span>
+                    <textarea name="note" placeholder="What was changed and why?" required />
+                  </label>
+                  <button className="button secondary" type="submit">Add maintenance event</button>
+                </form>
+              </article>
+              <article className="panel span-8">
+                <h3>Maintenance history — {selectedDrone.name}</h3>
+                {selectedDrone.maintenance_events.length === 0 && (
+                  <p style={{color:'var(--text-muted)',fontSize:'0.88rem'}}>No maintenance events yet.</p>
+                )}
+                <div className="note-list">
+                  {selectedDrone.maintenance_events.map((note) => (
+                    <div key={note.id} className="card">
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                        <strong>{note.title}</strong>
+                        <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'maintenance')}>✕</button>
+                      </div>
+                      <p>{note.note}</p>
+                      <small>{formatDate(note.created_at)}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </section>
+          )}
+
+          {/* ── COMPARE TAB ── */}
+          {droneTab === 'compare' && (
+            <section className="content-grid">
+              <article className="panel span-4">
+                <h3>Compare snapshots</h3>
+                {selectedDrone.snapshots.length < 2 && (
+                  <p style={{color:'var(--text-muted)',fontSize:'0.88rem'}}>Need at least 2 snapshots to compare.</p>
+                )}
+                <form className="stack" onSubmit={(event) => void handleCompare(event)}>
+                  <label className="field">
+                    <span>Left snapshot</span>
+                    <select name="left_snapshot_id" defaultValue="">
+                      <option value="">Select snapshot</option>
+                      {selectedDrone.snapshots.map((snapshot) => (
+                        <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Right snapshot</span>
+                    <select name="right_snapshot_id" defaultValue="">
+                      <option value="">Select snapshot</option>
+                      {selectedDrone.snapshots.map((snapshot) => (
+                        <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="button" type="submit">Compare</button>
+                </form>
+              </article>
+              <article className="panel span-8">
+                <h3>Diff result</h3>
+                {compareResult ? (
+                  <div className="stack">
+                    <div className="badge-row">
+                      <span className="badge warm">Added: {compareResult.added_lines}</span>
+                      <span className="badge">Removed: {compareResult.removed_lines}</span>
+                    </div>
+                    {compareResult.diff ? (
+                      <pre className="code-box" style={{whiteSpace:'pre-wrap'}}>
+                        {compareResult.diff.split('\n').map((line, i) => {
+                          let cls = '';
+                          if (line.startsWith('+')) cls = 'diff-added';
+                          else if (line.startsWith('-')) cls = 'diff-removed';
+                          else if (line.startsWith('@@')) cls = 'diff-header';
+                          return <span key={i} className={cls || undefined}>{line + '\n'}</span>;
+                        })}
+                      </pre>
+                    ) : <p>No textual diff between the snapshots.</p>}
+                  </div>
+                ) : (
+                  <p style={{color:'var(--text-muted)'}}>No comparison run yet. Select two snapshots and click Compare.</p>
+                )}
+              </article>
+            </section>
+          )}
+        </div>
       ) : null}
 
       {/* ── Battery fleet (global, not per-drone) ─────────────────────────── */}
+      {showBatterySections && (
       <section className="content-grid">
         <article className="panel span-4">
           <h2>Add battery</h2>
@@ -1479,6 +2008,7 @@ export default function HomePage() {
           )}
         </article>
       </section>
+      )}
     </main>
   );
 }
