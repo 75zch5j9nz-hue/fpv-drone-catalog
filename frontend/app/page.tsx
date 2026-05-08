@@ -327,6 +327,7 @@ export default function HomePage() {
   // Hardware history panel for a selected drone
   const [showHwHistory, setShowHwHistory] = useState<number | null>(null); // drone id
   const [hwHistory, setHwHistory] = useState<InstalledComponent[]>([]);
+  const [droneTab, setDroneTab] = useState<'snapshots' | 'flight-log' | 'maintenance' | 'compare'>('snapshots');
 
   function setOk(msg: string) { setStatusIsError(false); setStatus(msg); }
   function setErr(msg: string) { setStatusIsError(true); setStatus(msg); }
@@ -1572,293 +1573,363 @@ export default function HomePage() {
       )}
 
       {showDroneSections && selectedDrone ? (
-        <section className="content-grid">
-          <article className="panel span-4">
-            <h3>Create snapshot</h3>
-            <form className="stack" onSubmit={(event) => void handleCreateSnapshot(event)}>
-              <label className="field">
-                <span>Snapshot name</span>
-                <input name="name" placeholder="2026-05-08 known-good" required />
-              </label>
-              <label className="field">
-                <span>Betaflight version</span>
-                <input name="betaflight_version" placeholder="4.5.2" />
-              </label>
-              <label className="field">
-                <span>Notes</span>
-                <textarea name="notes" placeholder="What changed in this snapshot?" />
-              </label>
-              <button className="button secondary" type="submit">Create snapshot</button>
-            </form>
-          </article>
-
-          <article className="panel span-8">
-            <h3>Upload dump, diff all, or raw CLI</h3>
-            <form className="stack" onSubmit={(event) => void handleUpload(event)}>
-              <div className="two-col">
-                <label className="field">
-                  <span>Target snapshot</span>
-                  <select name="snapshotId" defaultValue="">
-                    <option value="">Create or use without snapshot</option>
-                    {selectedDrone.snapshots.map((snapshot) => (
-                      <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Or create snapshot on upload</span>
-                  <input name="snapshotName" placeholder="2026-05-08 post-repair" />
-                </label>
-              </div>
-              <label className="field">
-                <span>Paste raw CLI text (paste-first: just paste and upload)</span>
-                <textarea name="rawText" placeholder="Paste dump / diff all output here. No file needed — just paste and click Upload." />
-              </label>
-              <div className="two-col">
-                <label className="field">
-                  <span>Export type</span>
-                  <select name="exportType" defaultValue="dump">
-                    <option value="dump">dump</option>
-                    <option value="diff_all">diff_all</option>
-                    <option value="status">status</option>
-                    <option value="version">version</option>
-                    <option value="photo">photo</option>
-                    <option value="blackbox">blackbox</option>
-                    <option value="misc">misc</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Or upload a file</span>
-                  <input name="file" type="file" />
-                </label>
-              </div>
-              <div className="actions">
-                <button className="button" type="submit">Upload</button>
-              </div>
-            </form>
-          </article>
-
-          <article className="panel span-5">
-            <h3>Snapshots</h3>
-            <div className="snapshot-list">
-              {selectedDrone.snapshots.map((snapshot) => (
-                <div key={snapshot.id} className={`card ${snapshot.id === selectedSnapshotId ? 'active' : ''}`}>
-                  <div className="meta">
-                    <strong>{snapshot.name}</strong>
-                    <span>{snapshot.betaflight_version || 'BF version unknown'}</span>
-                  </div>
-                  <div className="badge-row">
-                    {snapshot.is_current ? <span className="badge warm">Current</span> : null}
-                    {snapshot.is_known_good ? <span className="badge ok">Known-good</span> : null}
-                    <span className="badge">Files: {snapshot.files.length}</span>
-                    {(() => {
-                      const currentSnap = selectedDrone.snapshots.find((s) => s.is_current);
-                      if (currentSnap && currentSnap.id !== snapshot.id && snapshot.betaflight_version && currentSnap.betaflight_version && snapshot.betaflight_version !== currentSnap.betaflight_version) {
-                        return <span className="badge danger">BF version mismatch ({snapshot.betaflight_version} vs {currentSnap.betaflight_version})</span>;
-                      }
-                      return null;
-                    })()}
-                  </div>
-                  <p style={{margin:'4px 0 6px',fontSize:'0.85rem'}}>{snapshot.notes || 'No snapshot notes.'}</p>
-                  <small style={{color:'var(--muted)',fontSize:'0.78rem'}}>{formatDate(snapshot.created_at)}</small>
-                  <div className="actions" style={{marginTop:'8px'}}>
-                    <button className="button ghost" type="button" onClick={() => void openRawSnapshot(snapshot.id, snapshot.name)}>View raw</button>
-                    <button className="button ghost" type="button" onClick={() => void markSnapshot(snapshot.id, 'current')}>Mark current</button>
-                    <button className="button ghost" type="button" onClick={() => void markSnapshot(snapshot.id, 'known-good')}>Known-good</button>
-                    <button className="button ghost" type="button" onClick={() => setEditSnapshotId(editSnapshotId === snapshot.id ? null : snapshot.id)}>Edit</button>
-                    <button className="button danger" type="button" style={{padding:'4px 10px',fontSize:'0.78rem',marginLeft:'auto'}} onClick={() => void handleDeleteSnapshot(snapshot)}>Delete</button>
-                  </div>
-                  {editSnapshotId === snapshot.id && (
-                    <form className="stack" style={{marginTop:'8px',padding:'8px',background:'var(--bg)',borderRadius:'6px'}} onSubmit={(e) => void handleUpdateSnapshot(e, snapshot.id, selectedDroneId!)}>
-                      <label className="field">
-                        <span style={{fontSize:'0.82rem'}}>Name</span>
-                        <input name="name" defaultValue={snapshot.name} required style={{fontSize:'0.85rem'}} />
-                      </label>
-                      <label className="field">
-                        <span style={{fontSize:'0.82rem'}}>BF version</span>
-                        <input name="betaflight_version" defaultValue={snapshot.betaflight_version ?? ''} placeholder="4.5.2" style={{fontSize:'0.85rem'}} />
-                      </label>
-                      <label className="field">
-                        <span style={{fontSize:'0.82rem'}}>Notes</span>
-                        <textarea name="notes" defaultValue={snapshot.notes ?? ''} style={{fontSize:'0.85rem'}} />
-                      </label>
-                      <div className="actions">
-                        <button className="button" type="submit" style={{fontSize:'0.82rem',padding:'4px 10px'}}>Save</button>
-                        <button className="button ghost" type="button" style={{fontSize:'0.82rem',padding:'4px 10px'}} onClick={() => setEditSnapshotId(null)}>Cancel</button>
-                      </div>
-                    </form>
-                  )}
-                  <div className="file-list">
-                    {snapshot.files.map((file) => (
-                      <div key={file.id} className="card">
-                        <div className="meta">
-                          <strong>{file.original_filename || file.role}</strong>
-                          <span>{file.role}</span>
-                        </div>
-                        <div className="badge-row">
-                          <span className="badge">{file.size_bytes} bytes</span>
-                          <span className="badge">{file.parse_status}</span>
-                        </div>
-                        <div className="actions">
-                          <a className="button ghost" href={`${apiBase}/api/files/${file.id}/download`} target="_blank">Download</a>
-                          <button className="button danger" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => void handleDeleteFile(file)}>Delete</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+        <div className="drone-workspace">
+          {/* ── Drone workspace header + tabs ── */}
+          <div className="dw-header">
+            <div className="dw-title">
+              <span style={{fontSize:'1.1rem'}}>📍</span>
+              <strong>{selectedDrone.name}</strong>
+              <span className="badge" style={{background: STATUS_META[selectedDrone.status].bg, color: STATUS_META[selectedDrone.status].color}}>
+                {STATUS_META[selectedDrone.status].label}
+              </span>
+              {selectedDrone.auw_grams && <span className="badge">{selectedDrone.auw_grams}g</span>}
+            </div>
+            <div className="dw-tabs">
+              {([
+                ['snapshots', `Snapshots (${selectedDrone.snapshots.length})`],
+                ['flight-log', `Flight Log (${selectedDrone.flight_notes.length})`],
+                ['maintenance', `Maintenance (${selectedDrone.maintenance_events.length})`],
+                ['compare', 'Compare'],
+              ] as const).map(([tab, label]) => (
+                <button
+                  key={tab}
+                  className={`dw-tab${droneTab === tab ? ' active' : ''}`}
+                  type="button"
+                  onClick={() => setDroneTab(tab)}
+                >
+                  {label}
+                </button>
               ))}
             </div>
-          </article>
+          </div>
 
-          <article className="panel span-7">
-            <h3>Raw snapshot viewer</h3>
-            {selectedSnapshot ? <p>Active snapshot: <strong>{selectedSnapshot.name}</strong></p> : null}
-            {rawSnapshot?.files.length ? rawSnapshot.files.map((file) => (
-              <div key={file.file_id} className="stack">
-                <div className="badge-row" style={{justifyContent:'space-between'}}>
-                  <div className="badge-row">
-                    <span className="badge warm">{file.role}</span>
-                    <span className="badge">{file.original_filename || 'inline text'}</span>
+          {/* ── SNAPSHOTS TAB ── */}
+          {droneTab === 'snapshots' && (
+            <section className="content-grid">
+              <article className="panel span-4">
+                <h3>Create snapshot</h3>
+                <form className="stack" onSubmit={(event) => void handleCreateSnapshot(event)}>
+                  <label className="field">
+                    <span>Snapshot name</span>
+                    <input name="name" placeholder="2026-05-08 known-good" required />
+                  </label>
+                  <label className="field">
+                    <span>Betaflight version</span>
+                    <input name="betaflight_version" placeholder="4.5.2" />
+                  </label>
+                  <label className="field">
+                    <span>Notes</span>
+                    <textarea name="notes" placeholder="What changed in this snapshot?" />
+                  </label>
+                  <button className="button secondary" type="submit">Create snapshot</button>
+                </form>
+              </article>
+
+              <article className="panel span-8">
+                <h3>Upload dump, diff all, or raw CLI</h3>
+                <form className="stack" onSubmit={(event) => void handleUpload(event)}>
+                  <div className="two-col">
+                    <label className="field">
+                      <span>Target snapshot</span>
+                      <select name="snapshotId" defaultValue="">
+                        <option value="">Create or use without snapshot</option>
+                        {selectedDrone.snapshots.map((snapshot) => (
+                          <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Or create snapshot on upload</span>
+                      <input name="snapshotName" placeholder="2026-05-08 post-repair" />
+                    </label>
                   </div>
-                  <button
-                    className="button ghost"
-                    type="button"
-                    style={{padding:'4px 12px',fontSize:'0.82rem'}}
-                    onClick={() => void copyToClipboard(file.content)}
-                  >Copy</button>
-                </div>
-                {file.parsed_config && Object.keys(file.parsed_config).length > 0 && (
-                  <details style={{marginBottom:'6px'}}>
-                    <summary style={{cursor:'pointer',fontWeight:600,fontSize:'0.88rem',color:'var(--muted)'}}>
-                      Structured config ({Object.values(file.parsed_config).reduce((acc, s) => acc + s.length, 0)} settings)
-                    </summary>
-                    {Object.entries(file.parsed_config).map(([section, entries]) => (
-                      <details key={section} style={{marginLeft:'14px',marginTop:'4px'}}>
-                        <summary style={{cursor:'pointer',fontSize:'0.85rem',display:'flex',alignItems:'center',gap:'8px'}}>
-                          <span style={{textTransform:'capitalize'}}>{section}</span>
-                          <span style={{color:'var(--muted)'}}>({entries.length})</span>
-                          <button className="button ghost" type="button" style={{padding:'2px 8px',fontSize:'0.75rem',marginLeft:'auto'}} onClick={(e) => { e.preventDefault(); copySectionAsCLI(entries); }}>Copy {section}</button>
-                        </summary>
-                        <table style={{width:'100%',fontSize:'0.82rem',borderCollapse:'collapse',marginTop:'4px'}}>
-                          <tbody>
-                            {entries.map(({key, value}) => (
-                              <tr key={key} style={{borderBottom:'1px solid var(--border)'}}>
-                                <td style={{padding:'3px 8px',color:'var(--muted)',fontFamily:'monospace'}}>{key}</td>
-                                <td style={{padding:'3px 8px',fontWeight:600,fontFamily:'monospace'}}>{value}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </details>
-                    ))}
-                  </details>
+                  <label className="field">
+                    <span>Paste raw CLI text (paste-first: just paste and upload)</span>
+                    <textarea name="rawText" placeholder="Paste dump / diff all output here. No file needed — just paste and click Upload." />
+                  </label>
+                  <div className="two-col">
+                    <label className="field">
+                      <span>Export type</span>
+                      <select name="exportType" defaultValue="dump">
+                        <option value="dump">dump</option>
+                        <option value="diff_all">diff_all</option>
+                        <option value="status">status</option>
+                        <option value="version">version</option>
+                        <option value="photo">photo</option>
+                        <option value="blackbox">blackbox</option>
+                        <option value="misc">misc</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Or upload a file</span>
+                      <input name="file" type="file" />
+                    </label>
+                  </div>
+                  <div className="actions">
+                    <button className="button" type="submit">Upload</button>
+                  </div>
+                </form>
+              </article>
+
+              <article className="panel span-5">
+                <h3>Snapshot history</h3>
+                {selectedDrone.snapshots.length === 0 && (
+                  <p style={{color:'var(--text-muted)',fontSize:'0.88rem'}}>No snapshots yet. Create one above.</p>
                 )}
-                <pre className="code-box">{file.content}</pre>
-              </div>
-            )) : <p>No raw files attached to the selected snapshot.</p>}
-          </article>
-
-          <article className="panel span-4">
-            <h3>Add flight note</h3>
-            <form className="stack" onSubmit={(event) => void handleCreateNote(event, 'flights')}>
-              <label className="field">
-                <span>Title</span>
-                <input name="title" placeholder="First tuning pack" required />
-              </label>
-              <label className="field">
-                <span>Note</span>
-                <textarea name="note" placeholder="How did it fly?" required />
-              </label>
-              <button className="button secondary" type="submit">Add flight note</button>
-            </form>
-            <div className="note-list">
-              {selectedDrone.flight_notes.map((note) => (
-                <div key={note.id} className="card">
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                    <strong>{note.title}</strong>
-                    <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'flights')}>✕</button>
-                  </div>
-                  <p>{note.note}</p>
-                  <small>{formatDate(note.created_at)}</small>
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="panel span-4">
-            <h3>Add maintenance event</h3>
-            <form className="stack" onSubmit={(event) => void handleCreateNote(event, 'maintenance')}>
-              <label className="field">
-                <span>Title</span>
-                <input name="title" placeholder="Replaced front-left motor" required />
-              </label>
-              <label className="field">
-                <span>Note</span>
-                <textarea name="note" placeholder="What was changed and why?" required />
-              </label>
-              <button className="button secondary" type="submit">Add maintenance event</button>
-            </form>
-            <div className="note-list">
-              {selectedDrone.maintenance_events.map((note) => (
-                <div key={note.id} className="card">
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                    <strong>{note.title}</strong>
-                    <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'maintenance')}>✕</button>
-                  </div>
-                  <p>{note.note}</p>
-                  <small>{formatDate(note.created_at)}</small>
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="panel span-4">
-            <h3>Compare snapshots</h3>
-            <form className="stack" onSubmit={(event) => void handleCompare(event)}>
-              <label className="field">
-                <span>Left snapshot</span>
-                <select name="left_snapshot_id" defaultValue="">
-                  <option value="">Select snapshot</option>
+                <div className="snapshot-list">
                   {selectedDrone.snapshots.map((snapshot) => (
-                    <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
+                    <div key={snapshot.id} className={`card ${snapshot.id === selectedSnapshotId ? 'active' : ''}`}>
+                      <div className="meta">
+                        <strong>{snapshot.name}</strong>
+                        <span>{snapshot.betaflight_version || 'BF version unknown'}</span>
+                      </div>
+                      <div className="badge-row">
+                        {snapshot.is_current ? <span className="badge warm">Current</span> : null}
+                        {snapshot.is_known_good ? <span className="badge ok">Known-good</span> : null}
+                        <span className="badge">Files: {snapshot.files.length}</span>
+                        {(() => {
+                          const currentSnap = selectedDrone.snapshots.find((s) => s.is_current);
+                          if (currentSnap && currentSnap.id !== snapshot.id && snapshot.betaflight_version && currentSnap.betaflight_version && snapshot.betaflight_version !== currentSnap.betaflight_version) {
+                            return <span className="badge danger">BF version mismatch ({snapshot.betaflight_version} vs {currentSnap.betaflight_version})</span>;
+                          }
+                          return null;
+                        })()}
+                      </div>
+                      <p style={{margin:'4px 0 6px',fontSize:'0.85rem'}}>{snapshot.notes || 'No snapshot notes.'}</p>
+                      <small style={{color:'var(--muted)',fontSize:'0.78rem'}}>{formatDate(snapshot.created_at)}</small>
+                      <div className="actions" style={{marginTop:'8px'}}>
+                        <button className="button ghost" type="button" onClick={() => void openRawSnapshot(snapshot.id, snapshot.name)}>View raw</button>
+                        <button className="button ghost" type="button" onClick={() => void markSnapshot(snapshot.id, 'current')}>Mark current</button>
+                        <button className="button ghost" type="button" onClick={() => void markSnapshot(snapshot.id, 'known-good')}>Known-good</button>
+                        <button className="button ghost" type="button" onClick={() => setEditSnapshotId(editSnapshotId === snapshot.id ? null : snapshot.id)}>Edit</button>
+                        <button className="button danger" type="button" style={{padding:'4px 10px',fontSize:'0.78rem',marginLeft:'auto'}} onClick={() => void handleDeleteSnapshot(snapshot)}>Delete</button>
+                      </div>
+                      {editSnapshotId === snapshot.id && (
+                        <form className="stack" style={{marginTop:'8px',padding:'8px',background:'var(--bg)',borderRadius:'6px'}} onSubmit={(e) => void handleUpdateSnapshot(e, snapshot.id, selectedDroneId!)}>
+                          <label className="field">
+                            <span style={{fontSize:'0.82rem'}}>Name</span>
+                            <input name="name" defaultValue={snapshot.name} required style={{fontSize:'0.85rem'}} />
+                          </label>
+                          <label className="field">
+                            <span style={{fontSize:'0.82rem'}}>BF version</span>
+                            <input name="betaflight_version" defaultValue={snapshot.betaflight_version ?? ''} placeholder="4.5.2" style={{fontSize:'0.85rem'}} />
+                          </label>
+                          <label className="field">
+                            <span style={{fontSize:'0.82rem'}}>Notes</span>
+                            <textarea name="notes" defaultValue={snapshot.notes ?? ''} style={{fontSize:'0.85rem'}} />
+                          </label>
+                          <div className="actions">
+                            <button className="button" type="submit" style={{fontSize:'0.82rem',padding:'4px 10px'}}>Save</button>
+                            <button className="button ghost" type="button" style={{fontSize:'0.82rem',padding:'4px 10px'}} onClick={() => setEditSnapshotId(null)}>Cancel</button>
+                          </div>
+                        </form>
+                      )}
+                      <div className="file-list">
+                        {snapshot.files.map((file) => (
+                          <div key={file.id} className="card">
+                            <div className="meta">
+                              <strong>{file.original_filename || file.role}</strong>
+                              <span>{file.role}</span>
+                            </div>
+                            <div className="badge-row">
+                              <span className="badge">{file.size_bytes} bytes</span>
+                              <span className="badge">{file.parse_status}</span>
+                            </div>
+                            <div className="actions">
+                              <a className="button ghost" href={`${apiBase}/api/files/${file.id}/download`} target="_blank">Download</a>
+                              <button className="button danger" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => void handleDeleteFile(file)}>Delete</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>Right snapshot</span>
-                <select name="right_snapshot_id" defaultValue="">
-                  <option value="">Select snapshot</option>
-                  {selectedDrone.snapshots.map((snapshot) => (
-                    <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
-                  ))}
-                </select>
-              </label>
-              <button className="button" type="submit">Compare</button>
-            </form>
-            {compareResult ? (
-              <div className="stack">
-                <div className="badge-row">
-                  <span className="badge warm">Added: {compareResult.added_lines}</span>
-                  <span className="badge">Removed: {compareResult.removed_lines}</span>
                 </div>
-                {compareResult.diff ? (
-                  <pre className="code-box" style={{whiteSpace:'pre-wrap'}}>
-                    {compareResult.diff.split('\n').map((line, i) => {
-                      let cls = '';
-                      if (line.startsWith('+')) cls = 'diff-added';
-                      else if (line.startsWith('-')) cls = 'diff-removed';
-                      else if (line.startsWith('@@')) cls = 'diff-header';
-                      return <span key={i} className={cls || undefined}>{line + '\n'}</span>;
-                    })}
-                  </pre>
-                ) : <p>No textual diff between the snapshots.</p>}
-              </div>
-            ) : (
-              <p>No comparison run yet.</p>
-            )}
-          </article>
-        </section>
+              </article>
+
+              <article className="panel span-7">
+                <h3>Raw snapshot viewer</h3>
+                {selectedSnapshot ? <p>Active snapshot: <strong>{selectedSnapshot.name}</strong></p> : null}
+                {rawSnapshot?.files.length ? rawSnapshot.files.map((file) => (
+                  <div key={file.file_id} className="stack">
+                    <div className="badge-row" style={{justifyContent:'space-between'}}>
+                      <div className="badge-row">
+                        <span className="badge warm">{file.role}</span>
+                        <span className="badge">{file.original_filename || 'inline text'}</span>
+                      </div>
+                      <button
+                        className="button ghost"
+                        type="button"
+                        style={{padding:'4px 12px',fontSize:'0.82rem'}}
+                        onClick={() => void copyToClipboard(file.content)}
+                      >Copy</button>
+                    </div>
+                    {file.parsed_config && Object.keys(file.parsed_config).length > 0 && (
+                      <details style={{marginBottom:'6px'}}>
+                        <summary style={{cursor:'pointer',fontWeight:600,fontSize:'0.88rem',color:'var(--muted)'}}>
+                          Structured config ({Object.values(file.parsed_config).reduce((acc, s) => acc + s.length, 0)} settings)
+                        </summary>
+                        {Object.entries(file.parsed_config).map(([section, entries]) => (
+                          <details key={section} style={{marginLeft:'14px',marginTop:'4px'}}>
+                            <summary style={{cursor:'pointer',fontSize:'0.85rem',display:'flex',alignItems:'center',gap:'8px'}}>
+                              <span style={{textTransform:'capitalize'}}>{section}</span>
+                              <span style={{color:'var(--muted)'}}>({entries.length})</span>
+                              <button className="button ghost" type="button" style={{padding:'2px 8px',fontSize:'0.75rem',marginLeft:'auto'}} onClick={(e) => { e.preventDefault(); copySectionAsCLI(entries); }}>Copy {section}</button>
+                            </summary>
+                            <table style={{width:'100%',fontSize:'0.82rem',borderCollapse:'collapse',marginTop:'4px'}}>
+                              <tbody>
+                                {entries.map(({key, value}) => (
+                                  <tr key={key} style={{borderBottom:'1px solid var(--border)'}}>
+                                    <td style={{padding:'3px 8px',color:'var(--muted)',fontFamily:'monospace'}}>{key}</td>
+                                    <td style={{padding:'3px 8px',fontWeight:600,fontFamily:'monospace'}}>{value}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </details>
+                        ))}
+                      </details>
+                    )}
+                    <pre className="code-box">{file.content}</pre>
+                  </div>
+                )) : <p>No raw files attached to the selected snapshot.</p>}
+              </article>
+            </section>
+          )}
+
+          {/* ── FLIGHT LOG TAB ── */}
+          {droneTab === 'flight-log' && (
+            <section className="content-grid">
+              <article className="panel span-4">
+                <h3>Add flight note</h3>
+                <form className="stack" onSubmit={(event) => void handleCreateNote(event, 'flights')}>
+                  <label className="field">
+                    <span>Title</span>
+                    <input name="title" placeholder="First tuning pack" required />
+                  </label>
+                  <label className="field">
+                    <span>Note</span>
+                    <textarea name="note" placeholder="How did it fly?" required />
+                  </label>
+                  <button className="button secondary" type="submit">Add flight note</button>
+                </form>
+              </article>
+              <article className="panel span-8">
+                <h3>Flight history — {selectedDrone.name}</h3>
+                {selectedDrone.flight_notes.length === 0 && (
+                  <p style={{color:'var(--text-muted)',fontSize:'0.88rem'}}>No flight notes yet.</p>
+                )}
+                <div className="note-list">
+                  {selectedDrone.flight_notes.map((note) => (
+                    <div key={note.id} className="card">
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                        <strong>{note.title}</strong>
+                        <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'flights')}>✕</button>
+                      </div>
+                      <p>{note.note}</p>
+                      <small>{formatDate(note.created_at)}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </section>
+          )}
+
+          {/* ── MAINTENANCE TAB ── */}
+          {droneTab === 'maintenance' && (
+            <section className="content-grid">
+              <article className="panel span-4">
+                <h3>Add maintenance event</h3>
+                <form className="stack" onSubmit={(event) => void handleCreateNote(event, 'maintenance')}>
+                  <label className="field">
+                    <span>Title</span>
+                    <input name="title" placeholder="Replaced front-left motor" required />
+                  </label>
+                  <label className="field">
+                    <span>Note</span>
+                    <textarea name="note" placeholder="What was changed and why?" required />
+                  </label>
+                  <button className="button secondary" type="submit">Add maintenance event</button>
+                </form>
+              </article>
+              <article className="panel span-8">
+                <h3>Maintenance history — {selectedDrone.name}</h3>
+                {selectedDrone.maintenance_events.length === 0 && (
+                  <p style={{color:'var(--text-muted)',fontSize:'0.88rem'}}>No maintenance events yet.</p>
+                )}
+                <div className="note-list">
+                  {selectedDrone.maintenance_events.map((note) => (
+                    <div key={note.id} className="card">
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                        <strong>{note.title}</strong>
+                        <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'maintenance')}>✕</button>
+                      </div>
+                      <p>{note.note}</p>
+                      <small>{formatDate(note.created_at)}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </section>
+          )}
+
+          {/* ── COMPARE TAB ── */}
+          {droneTab === 'compare' && (
+            <section className="content-grid">
+              <article className="panel span-4">
+                <h3>Compare snapshots</h3>
+                {selectedDrone.snapshots.length < 2 && (
+                  <p style={{color:'var(--text-muted)',fontSize:'0.88rem'}}>Need at least 2 snapshots to compare.</p>
+                )}
+                <form className="stack" onSubmit={(event) => void handleCompare(event)}>
+                  <label className="field">
+                    <span>Left snapshot</span>
+                    <select name="left_snapshot_id" defaultValue="">
+                      <option value="">Select snapshot</option>
+                      {selectedDrone.snapshots.map((snapshot) => (
+                        <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Right snapshot</span>
+                    <select name="right_snapshot_id" defaultValue="">
+                      <option value="">Select snapshot</option>
+                      {selectedDrone.snapshots.map((snapshot) => (
+                        <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="button" type="submit">Compare</button>
+                </form>
+              </article>
+              <article className="panel span-8">
+                <h3>Diff result</h3>
+                {compareResult ? (
+                  <div className="stack">
+                    <div className="badge-row">
+                      <span className="badge warm">Added: {compareResult.added_lines}</span>
+                      <span className="badge">Removed: {compareResult.removed_lines}</span>
+                    </div>
+                    {compareResult.diff ? (
+                      <pre className="code-box" style={{whiteSpace:'pre-wrap'}}>
+                        {compareResult.diff.split('\n').map((line, i) => {
+                          let cls = '';
+                          if (line.startsWith('+')) cls = 'diff-added';
+                          else if (line.startsWith('-')) cls = 'diff-removed';
+                          else if (line.startsWith('@@')) cls = 'diff-header';
+                          return <span key={i} className={cls || undefined}>{line + '\n'}</span>;
+                        })}
+                      </pre>
+                    ) : <p>No textual diff between the snapshots.</p>}
+                  </div>
+                ) : (
+                  <p style={{color:'var(--text-muted)'}}>No comparison run yet. Select two snapshots and click Compare.</p>
+                )}
+              </article>
+            </section>
+          )}
+        </div>
       ) : null}
 
       {/* ── Battery fleet (global, not per-drone) ─────────────────────────── */}
