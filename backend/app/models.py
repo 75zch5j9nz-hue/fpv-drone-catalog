@@ -173,6 +173,10 @@ class Battery(Base):
     cycle_count: Mapped[int] = mapped_column(Integer, default=0)
     purchase_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Health tracking
+    batt_status: Mapped[str] = mapped_column(String(16), default="active")  # active|watchlist|retired|damaged
+    is_puffed: Mapped[bool] = mapped_column(Boolean, default=False)
+    internal_resistance_mohm: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -295,3 +299,18 @@ class InstalledComponent(Base):
     build_version: Mapped["BuildVersion"] = relationship(back_populates="installed_components")
     product: Mapped["Product | None"] = relationship(back_populates="installed_components")
     product_variant: Mapped["ProductVariant | None"] = relationship(back_populates="installed_components")
+
+
+class SpareStock(Base):
+    """Spare parts inventory."""
+    __tablename__ = "spare_stock"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    part_name: Mapped[str] = mapped_column(String(200))
+    category: Mapped[str | None] = mapped_column(String(60), nullable=True)   # props, motors, fc, esc, frame, other
+    quantity: Mapped[int] = mapped_column(Integer, default=0)
+    low_stock_threshold: Mapped[int] = mapped_column(Integer, default=2)
+    drone_id: Mapped[int | None] = mapped_column(ForeignKey("drones.id", ondelete="SET NULL"), nullable=True, index=True)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

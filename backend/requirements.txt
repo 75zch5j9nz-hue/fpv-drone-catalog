@@ -5,3 +5,4 @@ psycopg[binary]==3.2.7
 pydantic-settings==2.9.1
 python-multipart==0.0.20
 python-slugify==8.0.4
+qrcode[pil]==8.0

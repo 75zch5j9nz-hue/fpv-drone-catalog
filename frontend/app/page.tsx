@@ -57,6 +57,20 @@ type PreflightItem = {
   created_at: string;
 };
 
+type SpareStock = {
+  id: number;
+  part_name: string;
+  category: string | null;
+  quantity: number;
+  low_stock_threshold: number;
+  drone_id: number | null;
+  product_id: number | null;
+  notes: string | null;
+  created_at: string;
+};
+
+type QrModalState = { entityType: 'drone' | 'battery'; id: number; label: string };
+
 type Drone = {
   id: number;
   name: string;
@@ -95,7 +109,11 @@ type Battery = {
   cycle_count: number;
   purchase_date: string | null;
   notes: string | null;
+  batt_status: string;
+  is_puffed: boolean;
+  internal_resistance_mohm: number | null;
   created_at: string;
+  updated_at: string;
 };
 
 type RawSnapshotResponse = {
@@ -128,7 +146,7 @@ type AppStats = {
   by_category: Record<string, number>;
 };
 
-type DroneReadiness = 'ready' | 'needs_backup' | 'incomplete' | 'grounded';
+type DroneReadiness = 'ready' | 'needs_backup' | 'stale_backup' | 'incomplete' | 'grounded';
 
 // ── Catalogue types ────────────────────────────────────────────────────────────
 
@@ -312,15 +330,37 @@ const STATUS_META: Record<DroneStatus, {label: string; color: string; bg: string
 };
 
 const READINESS_META: Record<DroneReadiness, { label: string; color: string; bg: string }> = {
-  ready: { label: 'Ready', color: '#4fc38a', bg: 'rgba(79,195,138,0.16)' },
+  ready:        { label: 'Ready',        color: '#4fc38a', bg: 'rgba(79,195,138,0.16)' },
   needs_backup: { label: 'Needs backup', color: '#60a0f0', bg: 'rgba(96,160,240,0.16)' },
-  incomplete: { label: 'Incomplete', color: '#f0a830', bg: 'rgba(240,168,48,0.16)' },
-  grounded: { label: 'Grounded', color: '#e04040', bg: 'rgba(224,64,64,0.16)' },
+  stale_backup: { label: 'Stale backup', color: '#f0a830', bg: 'rgba(240,168,48,0.16)' },
+  incomplete:   { label: 'Incomplete',   color: '#f0a830', bg: 'rgba(240,168,48,0.16)' },
+  grounded:     { label: 'Grounded',     color: '#e04040', bg: 'rgba(224,64,64,0.16)' },
 };
 
 function normalizeCategory(value: string | null): string {
   return (value ?? '').toLowerCase().replace(/_/g, '-').trim();
 }
+
+/** Battery health 0-100. Degraded by cycles, age, puffing, IR. */
+function getBatteryHealth(bat: Battery): number {
+  let health = 100;
+  const maxCycles = bat.chemistry === 'li_ion' ? 400 : 200;
+  health -= Math.min(50, (bat.cycle_count / maxCycles) * 50);
+  if (bat.purchase_date) {
+    const months = (Date.now() - new Date(bat.purchase_date).getTime()) / (30 * 86_400_000);
+    health -= Math.min(20, (months / 24) * 20);
+  }
+  if (bat.is_puffed) health -= 25;
+  if (bat.internal_resistance_mohm && bat.internal_resistance_mohm > 30) health -= Math.min(15, (bat.internal_resistance_mohm - 30) / 10 * 5);
+  return Math.max(0, Math.round(health));
+}
+
+const BATT_STATUS_META: Record<string, {label: string; color: string; bg: string}> = {
+  active:    { label: 'Active',    color: '#4fc38a', bg: 'rgba(79,195,138,0.15)' },
+  watchlist: { label: 'Watchlist', color: '#f0a830', bg: 'rgba(240,168,48,0.15)' },
+  retired:   { label: 'Retired',   color: '#7a8599', bg: 'rgba(122,133,153,0.15)' },
+  damaged:   { label: 'Damaged',   color: '#e04040', bg: 'rgba(224,64,64,0.15)' },
+};
 
 function getDroneIssues(drone: Drone): string[] {
   const issues: string[] = [];
@@ -329,6 +369,11 @@ function getDroneIssues(drone: Drone): string[] {
   if (!drone.radio_link) issues.push('Missing radio link');
   if (!drone.stack && !drone.fc_target) issues.push('Missing stack / FC');
   if (!drone.video_system) issues.push('Missing video system');
+  if (drone.snapshots.length) {
+    const newest = drone.snapshots.reduce((a, b) => a.created_at > b.created_at ? a : b);
+    const ageDays = (Date.now() - new Date(newest.created_at).getTime()) / 86_400_000;
+    if (ageDays > 30) issues.push('Stale snapshot (>30 days)');
+  }
   return issues;
 }
 
@@ -401,6 +446,9 @@ export default function HomePage() {
   // Maintenance form type
   const [newMaintEventType, setNewMaintEventType] = useState('general');
 
+  const [qrModal, setQrModal] = useState<QrModalState | null>(null);
+  const [spareStock, setSpareStock] = useState<SpareStock[]>([]);
+
   function setOk(msg: string) { setStatusIsError(false); setStatus(msg); }
   function setErr(msg: string) { setStatusIsError(true); setStatus(msg); }
 
@@ -444,6 +492,7 @@ export default function HomePage() {
       Promise.all([
         loadDrones().catch((error: Error) => setErr((error as Error).message)),
         apiFetch<Battery[]>('/api/batteries').then(setBatteries).catch(() => {}),
+        apiFetch<SpareStock[]>('/api/spare-stock').then(setSpareStock).catch(() => {}),
       ]);
     });
   }, []);
@@ -1099,6 +1148,13 @@ export default function HomePage() {
             </Link>
           </div>
 
+          {spareStock.some(s => s.quantity <= s.low_stock_threshold) && (
+            <div className="panel" style={{marginBottom:'12px',background:'rgba(224,64,64,0.1)',border:'1px solid rgba(224,64,64,0.3)'}}>
+              <strong style={{color:'#e04040'}}>⚠ Low spare parts: </strong>
+              {spareStock.filter(s => s.quantity <= s.low_stock_threshold).map(s => `${s.part_name} (${s.quantity})`).join(' · ')}
+            </div>
+          )}
+
           {drones.length > 0 && (
             <div className="panel" style={{marginBottom:'18px'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',marginBottom:'10px'}}>
@@ -1123,7 +1179,10 @@ export default function HomePage() {
                         <div style={{display:'flex',flexWrap:'wrap',gap:'5px',marginBottom:'8px'}}>
                           {issues.map(issue => <span key={issue} className="badge" style={{fontSize:'0.72rem'}}>{issue}</span>)}
                         </div>
-                        <button className="button ghost" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => setSelectedDroneId(drone.id)}>Open drone</button>
+                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                          <button className="button ghost" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => setSelectedDroneId(drone.id)}>Open drone</button>
+                          <button className="button ghost" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => setQrModal({entityType:'drone',id:drone.id,label:drone.name})}>QR</button>
+                        </div>
                       </div>
                     );
                   })}
@@ -2434,28 +2493,118 @@ export default function HomePage() {
           <h2>Battery fleet</h2>
           {batteries.length === 0 ? <p>No batteries tracked yet.</p> : (
             <div className="battery-list">
-              {batteries.map((bat) => (
+              {batteries.map((bat) => {
+                const health = getBatteryHealth(bat);
+                const healthColor = health >= 70 ? '#4fc38a' : health >= 40 ? '#f0a830' : '#e04040';
+                const statusMeta = BATT_STATUS_META[bat.batt_status ?? 'active'] ?? BATT_STATUS_META.active;
+                return (
                 <div key={bat.id} className="card">
                   <div className="meta">
                     <strong>{bat.label}</strong>
                     <span>{bat.cell_count}S · {bat.capacity_mah} mAh · {bat.chemistry.replace('_','-').toUpperCase()}</span>
                   </div>
+                  <div style={{marginBottom:'6px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.78rem',marginBottom:'2px'}}>
+                      <span style={{color:'var(--text-muted)'}}>Health</span>
+                      <span style={{color:healthColor,fontWeight:600}}>{health}%</span>
+                    </div>
+                    <div style={{height:'6px',borderRadius:'4px',background:'rgba(255,255,255,0.08)',overflow:'hidden'}}>
+                      <div style={{height:'100%',width:`${health}%`,background:healthColor,borderRadius:'4px',transition:'width 0.4s'}}/>
+                    </div>
+                  </div>
                   <div className="badge-row">
                     <span className="badge warm">Cycles: {bat.cycle_count}</span>
                     {bat.purchase_date ? <span className="badge">Bought: {bat.purchase_date}</span> : null}
-                    {bat.cycle_count >= 200 ? <span className="badge" style={{background:'#b72b0f',color:'#fff'}}>Near retirement</span> : null}
+                    <span className="badge" style={{background:statusMeta.bg,color:statusMeta.color}}>{statusMeta.label}</span>
+                    {bat.is_puffed ? <span className="badge" style={{background:'rgba(224,64,64,0.2)',color:'#e04040'}}>Puffed</span> : null}
+                    {bat.internal_resistance_mohm ? <span className="badge">IR: {bat.internal_resistance_mohm}mΩ</span> : null}
                   </div>
                   {bat.notes ? <p style={{fontSize:'0.84rem',marginTop:'4px'}}>{bat.notes}</p> : null}
                   <div className="actions">
                     <button className="button ghost" type="button" onClick={() => void incrementCycles(bat.id, bat.cycle_count)}>+1 Cycle</button>
+                    {!bat.is_puffed && <button className="button ghost" type="button" style={{color:'#f0a830'}} onClick={() => void apiFetch<Battery>(`/api/batteries/${bat.id}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_puffed:true})}).then(() => apiFetch<Battery[]>('/api/batteries').then(setBatteries))}>Mark puffed</button>}
+                    {bat.batt_status !== 'retired' && <button className="button ghost" type="button" style={{color:'#7a8599'}} onClick={() => void apiFetch<Battery>(`/api/batteries/${bat.id}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({batt_status:'retired'})}).then(() => apiFetch<Battery[]>('/api/batteries').then(setBatteries))}>Retire</button>}
+                    <button className="button ghost" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => setQrModal({entityType:'battery',id:bat.id,label:bat.label})}>QR</button>
                     <button className="button ghost" type="button" style={{color:'#b72b0f'}} onClick={() => void deleteBattery(bat.id, bat.label)}>Remove</button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </article>
       </section>
+      )}
+
+      {/* ── Spare Parts Inventory ─────────────────────────────── */}
+      {isBatteriesPage && (
+      <section id="spare-parts" style={{padding:'0 20px 32px'}}>
+        <div className="panel">
+          <h2 style={{marginBottom:'16px'}}>Spare Parts Inventory</h2>
+          {spareStock.some(s => s.quantity <= s.low_stock_threshold) && (
+            <div style={{marginBottom:'12px',padding:'8px 12px',borderRadius:'6px',background:'rgba(224,64,64,0.1)',border:'1px solid rgba(224,64,64,0.3)',fontSize:'0.85rem'}}>
+              <strong style={{color:'#e04040'}}>⚠ Low stock: </strong>
+              {spareStock.filter(s => s.quantity <= s.low_stock_threshold).map(s => `${s.part_name} (${s.quantity} left)`).join(', ')}
+            </div>
+          )}
+          {spareStock.length === 0 ? <p>No spare parts tracked yet.</p> : (
+            <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'16px'}}>
+              {spareStock.map(item => (
+                <div key={item.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',borderRadius:'6px',background:'var(--card-bg)',border:'1px solid var(--border)'}}>
+                  <span style={{flex:1,fontWeight:500}}>{item.part_name}</span>
+                  {item.category && <span className="badge" style={{fontSize:'0.72rem'}}>{item.category}</span>}
+                  <span style={{color: item.quantity <= item.low_stock_threshold ? '#e04040' : '#4fc38a',fontWeight:600,minWidth:'30px',textAlign:'center'}}>{item.quantity}</span>
+                  <button className="button ghost" style={{padding:'2px 8px',fontSize:'0.78rem'}} type="button"
+                    onClick={() => void apiFetch<SpareStock>(`/api/spare-stock/${item.id}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({quantity: item.quantity + 1})})
+                      .then(() => apiFetch<SpareStock[]>('/api/spare-stock').then(setSpareStock))}>+1</button>
+                  <button className="button ghost" style={{padding:'2px 8px',fontSize:'0.78rem'}} type="button" disabled={item.quantity <= 0}
+                    onClick={() => void apiFetch<SpareStock>(`/api/spare-stock/${item.id}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({quantity: Math.max(0, item.quantity - 1)})})
+                      .then(() => apiFetch<SpareStock[]>('/api/spare-stock').then(setSpareStock))}>-1</button>
+                  <button className="button danger" style={{padding:'2px 8px',fontSize:'0.78rem'}} type="button"
+                    onClick={() => void apiFetch(`/api/spare-stock/${item.id}`, {method:'DELETE'})
+                      .then(() => setSpareStock(prev => prev.filter(s => s.id !== item.id)))}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <form style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'flex-end'}} onSubmit={e => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            const body = {part_name: String(fd.get('part_name')), category: String(fd.get('category')) || null, quantity: Number(fd.get('quantity')||0), low_stock_threshold: Number(fd.get('threshold')||1), notes: String(fd.get('notes')) || null};
+            void apiFetch<SpareStock>('/api/spare-stock', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+              .then(item => { setSpareStock(prev => [...prev, item].sort((a,b) => a.part_name.localeCompare(b.part_name))); (e.target as HTMLFormElement).reset(); });
+          }}>
+            <input name="part_name" placeholder="Part name" required style={{flex:'2 1 150px',padding:'6px 10px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--input-bg)',color:'var(--text)'}}/>
+            <input name="category" placeholder="Category (optional)" style={{flex:'1 1 120px',padding:'6px 10px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--input-bg)',color:'var(--text)'}}/>
+            <input name="quantity" type="number" min="0" defaultValue="1" placeholder="Qty" style={{width:'70px',padding:'6px 10px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--input-bg)',color:'var(--text)'}}/>
+            <input name="threshold" type="number" min="0" defaultValue="1" placeholder="Low at" style={{width:'80px',padding:'6px 10px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--input-bg)',color:'var(--text)'}}/>
+            <button className="button primary" type="submit">Add part</button>
+          </form>
+        </div>
+      </section>
+      )}
+
+      {/* ── QR Modal ─────────────────────────────────────────── */}
+      {qrModal && (
+        <div className="modal-backdrop" onClick={() => setQrModal(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
+          <div className="panel" onClick={e => e.stopPropagation()} style={{textAlign:'center',padding:'28px 32px',minWidth:'260px'}}>
+            <h3 style={{marginBottom:'8px'}}>QR Label</h3>
+            <p style={{fontSize:'0.85rem',color:'var(--muted)',marginBottom:'16px'}}>{qrModal.label}</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/qr/${qrModal.entityType}/${qrModal.id}?size=220`}
+              alt={`QR code for ${qrModal.label}`}
+              style={{display:'block',margin:'0 auto 16px',imageRendering:'pixelated'}}
+            />
+            <div style={{display:'flex',gap:'8px',justifyContent:'center'}}>
+              <a className="button ghost" style={{textDecoration:'none'}}
+                href={`/api/qr/${qrModal.entityType}/${qrModal.id}?size=400`}
+                download={`qr-${qrModal.entityType}-${qrModal.id}.png`}
+              >Download PNG</a>
+              <button className="button ghost" type="button" onClick={() => setQrModal(null)}>Close</button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

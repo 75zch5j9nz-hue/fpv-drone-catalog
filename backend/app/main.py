@@ -1,4 +1,5 @@
 import difflib
+import io
 import re
 import shutil
 import urllib.request
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
 from .db import Base, engine, get_db
-from .models import Battery, BuildVersion, Drone, FileRole, FlightNote, InstalledComponent, MaintenanceEvent, Manufacturer, PreflightChecklistItem, Product, ProductCategory, ProductVariant, Snapshot, StoredFile
+from .models import Battery, BuildVersion, Drone, FileRole, FlightNote, InstalledComponent, MaintenanceEvent, Manufacturer, PreflightChecklistItem, Product, ProductCategory, ProductVariant, Snapshot, SpareStock, StoredFile
 from .parser import parse_betaflight_config
 
 _BF_VERSION_RE = re.compile(r"Betaflight\s*/\s*(?:INAV\s*/\s*)?[^/]+\s+([0-9]+\.[0-9]+\.[0-9]+)", re.IGNORECASE)
@@ -54,6 +55,9 @@ from .schemas import (
     SnapshotCreate,
     SnapshotOut,
     SnapshotUpdate,
+    SpareStockCreate,
+    SpareStockOut,
+    SpareStockUpdate,
     StoredFileOut,
 )
 from .storage import (
@@ -105,6 +109,11 @@ def _run_migrations() -> None:
         ("damage_items", "TEXT"),
         ("repair_cost_pln", "INTEGER"),
     ]
+    new_battery_columns = [
+        ("batt_status", "VARCHAR(16) DEFAULT 'active'"),
+        ("is_puffed", "BOOLEAN DEFAULT FALSE"),
+        ("internal_resistance_mohm", "INTEGER"),
+    ]
     with engine.connect() as conn:
         for col, typedef in new_drone_columns:
             conn.execute(text(f"ALTER TABLE drones ADD COLUMN IF NOT EXISTS {col} {typedef}"))
@@ -112,6 +121,8 @@ def _run_migrations() -> None:
             conn.execute(text(f"ALTER TABLE flight_notes ADD COLUMN IF NOT EXISTS {col} {typedef}"))
         for col, typedef in new_maintenance_columns:
             conn.execute(text(f"ALTER TABLE maintenance_events ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+        for col, typedef in new_battery_columns:
+            conn.execute(text(f"ALTER TABLE batteries ADD COLUMN IF NOT EXISTS {col} {typedef}"))
         conn.commit()
 
 
@@ -831,6 +842,68 @@ def delete_battery(battery_id: int, db: Session = Depends(get_db)) -> None:
     if not battery:
         raise HTTPException(status_code=404, detail="Battery not found")
     db.delete(battery)
+    db.commit()
+
+
+# ── QR Code labels ────────────────────────────────────────────────────────────
+
+@app.get("/api/qr/{entity_type}/{entity_id}")
+def generate_qr(entity_type: str, entity_id: int, size: int = 200) -> Response:
+    """Return a PNG QR code for a drone or battery deep-link URL."""
+    if entity_type not in ("drone", "battery"):
+        raise HTTPException(status_code=400, detail="entity_type must be 'drone' or 'battery'")
+    settings = get_settings()
+    base_url = settings.app_url
+    path = f"/drones?id={entity_id}" if entity_type == "drone" else f"/?section=batteries&bat={entity_id}"
+    url = f"{base_url}{path}"
+    try:
+        import qrcode  # type: ignore
+        import qrcode.image.pil  # type: ignore
+        qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=max(1, size // 25), border=2)
+        qr.add_data(url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return Response(content=buf.getvalue(), media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
+    except ImportError:
+        raise HTTPException(status_code=503, detail="qrcode library not installed")
+
+
+# ── Spare Parts Inventory ─────────────────────────────────────────────────────
+
+@app.get("/api/spare-stock", response_model=list[SpareStockOut])
+def list_spare_stock(db: Session = Depends(get_db)) -> list[SpareStock]:
+    return list(db.execute(select(SpareStock).order_by(SpareStock.part_name)).scalars())
+
+
+@app.post("/api/spare-stock", response_model=SpareStockOut, status_code=201)
+def create_spare_stock(payload: SpareStockCreate, db: Session = Depends(get_db)) -> SpareStock:
+    item = SpareStock(**payload.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.patch("/api/spare-stock/{item_id}", response_model=SpareStockOut)
+def update_spare_stock(item_id: int, payload: SpareStockUpdate, db: Session = Depends(get_db)) -> SpareStock:
+    item = db.execute(select(SpareStock).where(SpareStock.id == item_id)).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Spare stock item not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(item, field, value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.delete("/api/spare-stock/{item_id}", status_code=204)
+def delete_spare_stock(item_id: int, db: Session = Depends(get_db)) -> None:
+    item = db.execute(select(SpareStock).where(SpareStock.id == item_id)).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Spare stock item not found")
+    db.delete(item)
     db.commit()
 
 

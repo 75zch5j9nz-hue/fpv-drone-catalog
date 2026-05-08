@@ -322,6 +322,9 @@ class BatteryCreate(BaseModel):
     cycle_count: int = Field(default=0, ge=0)
     purchase_date: str | None = None
     notes: str | None = None
+    batt_status: str = "active"
+    is_puffed: bool = False
+    internal_resistance_mohm: int | None = Field(default=None, ge=0)
 
 
 class BatteryUpdate(BaseModel):
@@ -332,6 +335,9 @@ class BatteryUpdate(BaseModel):
     cycle_count: int | None = Field(default=None, ge=0)
     purchase_date: str | None = None
     notes: str | None = None
+    batt_status: str | None = None
+    is_puffed: bool | None = None
+    internal_resistance_mohm: int | None = Field(default=None, ge=0)
 
 
 class BatteryOut(BaseModel):
@@ -345,6 +351,9 @@ class BatteryOut(BaseModel):
     cycle_count: int
     purchase_date: str | None
     notes: str | None
+    batt_status: str
+    is_puffed: bool
+    internal_resistance_mohm: int | None
     created_at: datetime
     updated_at: datetime
 
@@ -457,3 +466,39 @@ class RawSnapshotResponse(BaseModel):
     snapshot_id: int
     files: list[RawSnapshotFile]
 
+
+
+# ── Spare Stock ──────────────────────────────────────────────────────────────
+
+class SpareStockCreate(BaseModel):
+    part_name: str
+    category: str | None = None
+    quantity: int = 0
+    low_stock_threshold: int = 2
+    drone_id: int | None = None
+    product_id: int | None = None
+    notes: str | None = None
+
+
+class SpareStockUpdate(BaseModel):
+    part_name: str | None = None
+    category: str | None = None
+    quantity: int | None = None
+    low_stock_threshold: int | None = None
+    drone_id: int | None = None
+    product_id: int | None = None
+    notes: str | None = None
+
+
+class SpareStockOut(BaseModel):
+    id: int
+    part_name: str
+    category: str | None
+    quantity: int
+    low_stock_threshold: int
+    drone_id: int | None
+    product_id: int | None
+    notes: str | None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
