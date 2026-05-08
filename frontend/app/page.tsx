@@ -283,10 +283,11 @@ const STATUS_META: Record<DroneStatus, {label: string; color: string; bg: string
 
 export default function HomePage() {
   const pathname = usePathname();
+  const isOverviewPage = pathname === '/';
   const isDronesPage = pathname === '/drones';
   const isBatteriesPage = pathname === '/batteries';
-  const showDroneSections = !isBatteriesPage;
-  const showBatterySections = !isDronesPage;
+  const showDroneSections = !isBatteriesPage && !isOverviewPage;
+  const showBatterySections = !isDronesPage && !isOverviewPage;
 
   const [drones, setDrones] = useState<Drone[]>([]);
   const [batteries, setBatteries] = useState<Battery[]>([]);
@@ -909,10 +910,82 @@ export default function HomePage() {
       </section>
 
       <nav className="subnav" aria-label="Main navigation">
-        <Link className={`subnav-link${pathname === '/' ? ' active' : ''}`} href="/">Overview</Link>
+        <Link className={`subnav-link${isOverviewPage ? ' active' : ''}`} href="/">Overview</Link>
         <Link className={`subnav-link${isDronesPage ? ' active' : ''}`} href="/drones">Drones</Link>
         <Link className={`subnav-link${isBatteriesPage ? ' active' : ''}`} href="/batteries">Batteries</Link>
+        <Link className={`subnav-link${pathname === '/catalogue' ? ' active' : ''}`} href="/catalogue">Catalogue</Link>
+        <Link className={`subnav-link${pathname === '/snapshots' ? ' active' : ''}`} href="/snapshots">Snapshots</Link>
       </nav>
+
+      {isOverviewPage && (
+        <div className="overview-landing">
+          <div className="stat-strip">
+            <div className="stat-card">
+              <span className="stat-value">{drones.length}</span>
+              <span className="stat-label">Total Drones</span>
+            </div>
+            <div className="stat-card stat-green">
+              <span className="stat-value">{drones.filter(d => d.status === 'flyable').length}</span>
+              <span className="stat-label">Flyable</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value">{drones.reduce((n, d) => n + d.snapshots.length, 0)}</span>
+              <span className="stat-label">Snapshots</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value">{batteries.length}</span>
+              <span className="stat-label">Batteries</span>
+            </div>
+          </div>
+
+          <div className="quick-nav">
+            <Link href="/drones" className="quick-card">
+              <span className="quick-icon">🚁</span>
+              <span className="quick-title">Drones</span>
+              <span className="quick-sub">Manage fleet, create &amp; configure drones</span>
+            </Link>
+            <Link href="/batteries" className="quick-card">
+              <span className="quick-icon">🔋</span>
+              <span className="quick-title">Batteries</span>
+              <span className="quick-sub">Track LiPo / LiHV battery health &amp; cycles</span>
+            </Link>
+            <Link href="/catalogue" className="quick-card">
+              <span className="quick-icon">📦</span>
+              <span className="quick-title">Parts Catalogue</span>
+              <span className="quick-sub">Browse components across manufacturers</span>
+            </Link>
+            <Link href="/snapshots" className="quick-card">
+              <span className="quick-icon">📸</span>
+              <span className="quick-title">Snapshots</span>
+              <span className="quick-sub">Betaflight configs &amp; backups across all drones</span>
+            </Link>
+          </div>
+
+          {drones.length > 0 && (
+            <div className="recent-section">
+              <div className="recent-header">
+                <h3>Recent Drones</h3>
+                <Link href="/drones" className="see-all-link">View all {drones.length} →</Link>
+              </div>
+              <div className="recent-list">
+                {drones.slice(0, 6).map(d => (
+                  <Link key={d.id} href="/drones" className="recent-item">
+                    {d.image_url
+                      ? <img src={d.image_url} alt="" className="recent-thumb" />
+                      : <div className="recent-thumb-placeholder">🚁</div>}
+                    <div className="recent-item-info">
+                      <span className="recent-name">{d.name}</span>
+                      <span className="recent-meta" style={{background: STATUS_META[d.status].bg, color: STATUS_META[d.status].color}}>
+                        {STATUS_META[d.status].label}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {showDroneSections && (
       <section className="hero-grid">
