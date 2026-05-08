@@ -1,11 +1,13 @@
 import difflib
 import re
 import shutil
+import urllib.request
 from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session, selectinload
 
@@ -155,6 +157,31 @@ def health(db: Session = Depends(get_db)) -> dict[str, str]:
         "database": "connected",
         "uploadDir": "writable" if writable else "missing",
     }
+
+
+_PROXY_ALLOWED_HOST = "iflight.oss-cn-hongkong.aliyuncs.com"
+_PROXY_REFERER = "https://shop.iflight.com/"
+
+
+@app.get("/api/proxy-image")
+async def proxy_image(url: str) -> Response:
+    """Proxy manufacturer CDN images that require a specific Referer header."""
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or parsed.netloc != _PROXY_ALLOWED_HOST:
+        raise HTTPException(status_code=400, detail="URL not allowed")
+
+    def _fetch():
+        req = urllib.request.Request(url, headers={"Referer": _PROXY_REFERER, "User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            content_type = resp.headers.get("Content-Type", "image/jpeg")
+            return resp.read(), content_type
+
+    try:
+        data, content_type = await run_in_threadpool(_fetch)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Failed to fetch image")
+    return Response(content=data, media_type=content_type)
 
 
 @app.get("/api/drones", response_model=list[DroneOut])
