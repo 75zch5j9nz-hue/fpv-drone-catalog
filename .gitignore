@@ -1,0 +1,26 @@
+# Secrets
+.env
+
+# Build artefacts
+.next/
+frontend/.next/
+frontend/node_modules/
+backend/.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Storage – runtime data (keep directory structure, ignore content)
+storage/exports/*.zip
+storage/backups/database/*.sql
+storage/backups/files/*.tar.gz
+storage/uploads/
+storage/raw/
+
+# OS / editor
+.DS_Store
+*.swp
+*.swo
+.vscode/
+
