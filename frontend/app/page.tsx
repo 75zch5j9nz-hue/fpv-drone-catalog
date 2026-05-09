@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { FormEvent, Fragment, useCallback, useEffect, useState, useTransition } from 'react';
 import seedJson from '../data/drone-parts-mapping.seed.json';
 
@@ -42,10 +42,19 @@ type Note = {
   battery_id?: number | null;
   duration_minutes?: number | null;
   battery_used_percent?: number | null;
+  flight_date?: string | null;
+  location?: string | null;
+  wind_speed_kmh?: number | null;
+  temperature_c?: number | null;
+  outcome?: string;
+  motor_temps?: string | null;
+  battery_voltage_after?: number | null;
   // Maintenance event optional fields
   event_type?: string;
   damage_items?: string | null;
   repair_cost_pln?: number | null;
+  crash_severity?: string | null;
+  spare_parts_used?: string | null;
 };
 
 type PreflightItem = {
@@ -112,6 +121,15 @@ type Battery = {
   batt_status: string;
   is_puffed: boolean;
   internal_resistance_mohm: number | null;
+  ir_c1_mohm: number | null;
+  ir_c2_mohm: number | null;
+  ir_c3_mohm: number | null;
+  ir_c4_mohm: number | null;
+  ir_c5_mohm: number | null;
+  ir_c6_mohm: number | null;
+  last_charged_at: string | null;
+  voltage_after_last_flight: number | null;
+  assigned_drone_id: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -317,13 +335,13 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString();
+  return new Date(value).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 const STATUS_META: Record<DroneStatus, {label: string; color: string; bg: string}> = {
   flyable:        { label: 'Flyable',       color: '#4fc38a', bg: 'rgba(79,195,138,0.15)' },
   needs_repair:   { label: 'Needs repair',  color: '#f0a830', bg: 'rgba(240,168,48,0.15)' },
-  grounded_crash: { label: 'Crashed',       color: '#e04040', bg: 'rgba(224,64,64,0.15)' },
+  grounded_crash: { label: 'Crashed / grounded', color: '#e04040', bg: 'rgba(224,64,64,0.15)' },
   in_build:       { label: 'In build',      color: '#60a0f0', bg: 'rgba(96,160,240,0.15)' },
   retired:        { label: 'Retired',       color: '#7a8599', bg: 'rgba(122,133,153,0.15)' },
   for_parts:      { label: 'For parts',     color: '#7a8599', bg: 'rgba(122,133,153,0.12)' },
@@ -389,6 +407,7 @@ function getDroneReadiness(drone: Drone): DroneReadiness {
 
 export default function HomePage() {
   const pathname = usePathname();
+  const router = useRouter();
   const isOverviewPage = pathname === '/';
   const isDronesPage = pathname === '/drones';
   const isBatteriesPage = pathname === '/batteries';
@@ -448,6 +467,10 @@ export default function HomePage() {
 
   const [qrModal, setQrModal] = useState<QrModalState | null>(null);
   const [spareStock, setSpareStock] = useState<SpareStock[]>([]);
+  const [lastCopiedSection, setLastCopiedSection] = useState<string | null>(null);
+  const [droneToConfirmDelete, setDroneToConfirmDelete] = useState<number | null>(null);
+  const [batteryToConfirmDelete, setBatteryToConfirmDelete] = useState<number | null>(null);
+  const [lastCopiedFileId, setLastCopiedFileId] = useState<number | null>(null);
 
   function setOk(msg: string) { setStatusIsError(false); setStatus(msg); }
   function setErr(msg: string) { setStatusIsError(true); setStatus(msg); }
@@ -686,7 +709,7 @@ export default function HomePage() {
       await apiFetch(`/api/drones/${selectedDrone.id}/uploads`, { method: 'POST', body: formData });
       form.reset();
       await loadDrones(selectedDrone.id);
-      setOk('Upload stored in persistent volume.');
+      setOk('Upload stored. BF version auto-detected from file header if present.');
     } catch (error) {
       setErr(`Upload failed: ${(error as Error).message}`);
     }
@@ -698,6 +721,12 @@ export default function HomePage() {
     const formData = new FormData(form);
     setOk('Saving battery...');
     try {
+      const irCells: Record<string, number | null> = {};
+      [1,2,3,4,5,6].forEach(n => {
+        const v = formData.get(`ir_c${n}_mohm`) as string;
+        irCells[`ir_c${n}_mohm`] = v ? parseInt(v, 10) : null;
+      });
+      const assignedDrone = formData.get('assigned_drone_id') as string;
       const battery = await apiFetch<Battery>('/api/batteries', {
         method: 'POST',
         body: JSON.stringify({
@@ -708,6 +737,8 @@ export default function HomePage() {
           cycle_count: parseInt((formData.get('cycle_count') as string) || '0', 10),
           purchase_date: formData.get('purchase_date') || null,
           notes: formData.get('notes') || null,
+          assigned_drone_id: assignedDrone ? parseInt(assignedDrone, 10) : null,
+          ...irCells,
         }),
       });
       form.reset();
@@ -734,6 +765,7 @@ export default function HomePage() {
   }
 
   async function deleteBattery(batteryId: number, label: string) {
+    setBatteryToConfirmDelete(null);
     try {
       await apiFetch(`/api/batteries/${batteryId}`, { method: 'DELETE' });
       setBatteries((prev) => prev.filter((b) => b.id !== batteryId));
@@ -744,6 +776,7 @@ export default function HomePage() {
   }
 
   async function handleCreateNote(event: FormEvent<HTMLFormElement>, type: 'flights' | 'maintenance') {
+    event.preventDefault();
     if (!selectedDrone) {
       setErr('Select a drone first.');
       return;
@@ -761,6 +794,19 @@ export default function HomePage() {
       if (battId) payload.battery_id = Number(battId);
       if (dur) payload.duration_minutes = Number(dur);
       if (pct) payload.battery_used_percent = Number(pct);
+      const fdate = formData.get('flight_date') as string;
+      if (fdate) payload.flight_date = fdate;
+      const loc = formData.get('location') as string;
+      if (loc) payload.location = loc;
+      const wind = formData.get('wind_speed_kmh') as string;
+      if (wind) payload.wind_speed_kmh = Number(wind);
+      const temp = formData.get('temperature_c') as string;
+      if (temp) payload.temperature_c = Number(temp);
+      payload.outcome = (formData.get('outcome') as string) || 'ok';
+      const mtemps = (['m1','m2','m3','m4'] as const).map(m => (formData.get(`motor_temp_${m}`) as string) || 'ok').join(',');
+      if (mtemps !== 'ok,ok,ok,ok') payload.motor_temps = mtemps;
+      const vafter = formData.get('battery_voltage_after') as string;
+      if (vafter) payload.battery_voltage_after = parseFloat(vafter);
     } else {
       const evType = formData.get('event_type') as string || 'general';
       payload.event_type = evType;
@@ -768,6 +814,16 @@ export default function HomePage() {
       if (damageItems) payload.damage_items = damageItems;
       const cost = formData.get('repair_cost_pln');
       if (cost) payload.repair_cost_pln = Number(cost);
+      const severity = formData.get('crash_severity') as string;
+      if (severity) payload.crash_severity = severity;
+      // Collect spare parts used
+      const spareParts: Array<{spare_stock_id: number; qty: number}> = [];
+      spareStock.forEach(item => {
+        const qtyStr = formData.get(`spare_qty_${item.id}`) as string;
+        const qty = parseInt(qtyStr || '0', 10);
+        if (qty > 0) spareParts.push({ spare_stock_id: item.id, qty });
+      });
+      if (spareParts.length > 0) payload.spare_parts_used = JSON.stringify(spareParts);
     }
     await submitJson(
       `/api/drones/${selectedDrone.id}/${type}`,
@@ -950,9 +1006,12 @@ export default function HomePage() {
     }
   }
 
-  function copySectionAsCLI(entries: Array<{key: string; value: string}>) {
+  function copySectionAsCLI(entries: Array<{key: string; value: string}>, sectionKey: string) {
     const lines = entries.map(({key, value}) => `set ${key} = ${value}`).join('\n');
-    void copyToClipboard(lines);
+    void copyToClipboard(lines).then(() => {
+      setLastCopiedSection(sectionKey);
+      setTimeout(() => setLastCopiedSection(null), 2000);
+    });
   }
 
   async function handleUpdateDrone(event: FormEvent<HTMLFormElement>, droneId: number) {
@@ -993,7 +1052,7 @@ export default function HomePage() {
   }
 
   async function handleDeleteDrone(drone: Drone) {
-    if (!confirm(`Delete "${drone.name}" and ALL its snapshots and files permanently?`)) return;
+    setDroneToConfirmDelete(null);
     try {
       await apiFetch(`/api/drones/${drone.id}`, { method: 'DELETE' });
       setSelectedDroneId(null);
@@ -1045,7 +1104,13 @@ export default function HomePage() {
     const left = Number(formData.get('left_snapshot_id'));
     const right = Number(formData.get('right_snapshot_id'));
     if (!left || !right) {
+      setCompareResult(null);
       setErr('Choose two snapshots to compare.');
+      return;
+    }
+    if (left === right) {
+      setCompareResult(null);
+      setErr('Choose two different snapshots to compare.');
       return;
     }
     setOk('Comparing snapshots...');
@@ -1155,41 +1220,119 @@ export default function HomePage() {
             </div>
           )}
 
-          {drones.length > 0 && (
-            <div className="panel" style={{marginBottom:'18px'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',marginBottom:'10px'}}>
-                <h3 style={{margin:0}}>Action queue</h3>
-                <span style={{fontSize:'0.8rem',color:'var(--text-muted)'}}>Highest-value fixes first</span>
+          {(() => {
+            const today = new Date();
+            const expiring = drones.filter(d => {
+              if (!d.registration_expiry) return false;
+              const exp = new Date(d.registration_expiry);
+              const daysLeft = (exp.getTime() - today.getTime()) / 86_400_000;
+              return daysLeft <= 30;
+            });
+            return expiring.length > 0 ? (
+              <div className="panel" style={{marginBottom:'12px',background:'rgba(240,168,48,0.1)',border:'1px solid rgba(240,168,48,0.3)'}}>
+                <strong style={{color:'#f0a830'}}>⚠ EASA registration expiring: </strong>
+                {expiring.map(d => {
+                  const exp = new Date(d.registration_expiry!);
+                  const daysLeft = Math.ceil((exp.getTime() - today.getTime()) / 86_400_000);
+                  return <span key={d.id} style={{marginRight:'10px'}}>{d.name} <span style={{color: daysLeft <= 0 ? '#e04040' : '#f0a830'}}>{daysLeft <= 0 ? '(expired)' : `(${daysLeft}d)`}</span></span>;
+                })}
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'10px'}}>
-                {[...drones]
-                  .filter(drone => getDroneReadiness(drone) !== 'ready')
-                  .sort((a, b) => getDroneIssues(b).length - getDroneIssues(a).length)
-                  .slice(0, 4)
-                  .map(drone => {
-                    const readiness = getDroneReadiness(drone);
-                    const meta = READINESS_META[readiness];
-                    const issues = getDroneIssues(drone);
+            ) : null;
+          })()}
+
+          {(() => {
+            const stale = batteries.filter(b => {
+              const lastUse = b.last_charged_at ? new Date(b.last_charged_at) : (b.updated_at ? new Date(b.updated_at) : null);
+              if (!lastUse || b.batt_status !== 'active') return false;
+              return (Date.now() - lastUse.getTime()) / 86_400_000 > 14;
+            });
+            return stale.length > 0 ? (
+              <div className="panel" style={{marginBottom:'12px',background:'rgba(96,160,240,0.1)',border:'1px solid rgba(96,160,240,0.3)'}}>
+                <strong style={{color:'#60a0f0'}}>🔋 Storage voltage check: </strong>
+                {stale.length} {stale.length === 1 ? 'battery' : 'batteries'} unused for 14+ days — check storage voltage (3.85V/cell). {stale.map(b => b.label).join(', ')}
+              </div>
+            ) : null;
+          })()}
+
+          {drones.length > 0 && (() => {
+            const flyable = drones.filter(d => d.status === 'flyable');
+            const readyNow = flyable.filter(d => getDroneReadiness(d) === 'ready');
+            const activeBats = batteries.filter(b => b.batt_status === 'active');
+            return (
+              <div className="panel" style={{marginBottom:'12px'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}}>
+                  <h3 style={{margin:0}}>Ready to fly</h3>
+                  <span style={{fontSize:'0.8rem',color:'var(--text-muted)'}}>{readyNow.length}/{flyable.length} flyable drones ready · {activeBats.length} active batteries</span>
+                </div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                  {flyable.length === 0 && <span style={{fontSize:'0.85rem',color:'var(--text-muted)'}}>No flyable drones in fleet.</span>}
+                  {flyable.map(d => {
+                    const r = getDroneReadiness(d);
+                    const color = r === 'ready' ? '#4fc38a' : r === 'needs_backup' ? '#60a0f0' : '#f0a830';
+                    const icon = r === 'ready' ? '✓' : r === 'needs_backup' ? '⚡' : '⚠';
                     return (
-                      <div key={drone.id} className="card" style={{textAlign:'left'}}>
-                        <div style={{display:'flex',justifyContent:'space-between',gap:'8px',alignItems:'flex-start',marginBottom:'6px'}}>
-                          <strong style={{lineHeight:1.3}}>{drone.name}</strong>
-                          <span className="badge" style={{background:meta.bg,color:meta.color,whiteSpace:'nowrap'}}>{meta.label}</span>
-                        </div>
-                        <div style={{display:'flex',flexWrap:'wrap',gap:'5px',marginBottom:'8px'}}>
-                          {issues.map(issue => <span key={issue} className="badge" style={{fontSize:'0.72rem'}}>{issue}</span>)}
-                        </div>
-                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                          <button className="button ghost" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => setSelectedDroneId(drone.id)}>Open drone</button>
-                          <button className="button ghost" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => setQrModal({entityType:'drone',id:drone.id,label:drone.name})}>QR</button>
-                        </div>
-                      </div>
+                      <Link key={d.id} href="/drones"
+                        style={{display:'inline-flex',alignItems:'center',gap:'5px',padding:'4px 10px',borderRadius:'6px',
+                          border:`1px solid ${color}30`,background:`${color}10`,color,fontSize:'0.8rem',textDecoration:'none'}}>
+                        {icon} {d.name}
+                      </Link>
                     );
                   })}
-                {[...drones].filter(drone => getDroneReadiness(drone) !== 'ready').length === 0 && (
-                  <div style={{color:'var(--text-muted)',fontSize:'0.85rem'}}>All drones are ready or only need routine logging.</div>
-                )}
+                </div>
               </div>
+            );
+          })()}
+
+          {drones.length > 0 && (
+            <div className="panel" style={{marginBottom:'18px'}}>
+              {(() => {
+                const actionDrones = [...drones]
+                  .filter(drone => getDroneReadiness(drone) !== 'ready')
+                  .sort((a, b) => getDroneIssues(b).length - getDroneIssues(a).length);
+                const visibleDrones = actionDrones.slice(0, 4);
+                const hiddenCount = actionDrones.length - visibleDrones.length;
+                return (
+                  <>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',marginBottom:'10px'}}>
+                      <h3 style={{margin:0}}>
+                        Action queue
+                        {actionDrones.length > 0 && <span style={{fontSize:'0.8rem',fontWeight:400,color:'var(--text-muted)',marginLeft:'5px'}}>({actionDrones.length})</span>}
+                      </h3>
+                      <span style={{fontSize:'0.8rem',color:'var(--text-muted)'}}>Most issues first</span>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'10px'}}>
+                      {actionDrones.length === 0 && (
+                        <div style={{color:'var(--text-muted)',fontSize:'0.85rem'}}>All drones are ready or only need routine logging.</div>
+                      )}
+                      {visibleDrones.map(drone => {
+                        const readiness = getDroneReadiness(drone);
+                        const meta = READINESS_META[readiness];
+                        const issues = getDroneIssues(drone);
+                        return (
+                          <div key={drone.id} className="card" style={{textAlign:'left'}}>
+                            <div style={{display:'flex',justifyContent:'space-between',gap:'8px',alignItems:'flex-start',marginBottom:'6px'}}>
+                              <strong style={{lineHeight:1.3}}>{drone.name}</strong>
+                              <span className="badge" style={{background:meta.bg,color:meta.color,whiteSpace:'nowrap'}}>{meta.label}</span>
+                            </div>
+                            <div style={{display:'flex',flexWrap:'wrap',gap:'5px',marginBottom:'8px'}}>
+                              {issues.map(issue => <span key={issue} className="badge" style={{fontSize:'0.72rem'}}>{issue}</span>)}
+                            </div>
+                            <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                              <button className="button ghost" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => { setSelectedDroneId(drone.id); router.push('/drones'); }}>Open drone</button>
+                              <button className="button ghost" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => setQrModal({entityType:'drone',id:drone.id,label:drone.name})}>QR</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {hiddenCount > 0 && (
+                      <p style={{fontSize:'0.8rem',color:'var(--text-muted)',margin:'8px 0 0'}}>
+                        +{hiddenCount} more — <Link href="/drones" style={{color:'var(--accent)'}}>view all on Drones page</Link>
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
 
@@ -1222,21 +1365,26 @@ export default function HomePage() {
       {showDroneSections && (
       <section className="hero-grid">
         <article className="panel span-4">
-          <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'12px'}}>
-            {([1,2,3] as const).map(s => (
-              <Fragment key={s}>
-                <div style={{width:24,height:24,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',
-                  fontSize:'0.75rem',fontWeight:700,
-                  background: createStep === s ? 'var(--accent)' : createStep > s ? '#4fc38a' : 'var(--surface2)',
-                  color: createStep >= s ? '#fff' : 'var(--text-muted)'}}>
-                  {createStep > s ? '✓' : s}
-                </div>
-                {s < 3 && <div style={{flex:1,height:2,background: createStep > s ? '#4fc38a' : 'var(--border)'}} />}
-              </Fragment>
-            ))}
-            <span style={{fontSize:'0.78rem',color:'var(--text-muted)',marginLeft:'4px'}}>
-              {createStep === 1 ? 'Basic Info' : createStep === 2 ? 'Hardware / Parts' : 'Review & Save'}
-            </span>
+          <div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginBottom:'12px'}}>
+            {([1,2,3] as const).map(s => {
+              const stepLabels = ['Basic Info', 'Hardware / Parts', 'Review & Save'];
+              return (
+                <Fragment key={s}>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',flexShrink:0}}>
+                    <div style={{width:24,height:24,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',
+                      fontSize:'0.75rem',fontWeight:700,
+                      background: createStep === s ? 'var(--accent)' : createStep > s ? '#4fc38a' : 'var(--surface2)',
+                      color: createStep >= s ? '#fff' : 'var(--text-muted)'}}>
+                      {createStep > s ? '✓' : s}
+                    </div>
+                    <span style={{fontSize:'0.65rem',color: createStep === s ? 'var(--text)' : 'var(--text-muted)',whiteSpace:'nowrap'}}>
+                      {stepLabels[s - 1]}
+                    </span>
+                  </div>
+                  {s < 3 && <div style={{flex:1,height:2,background: createStep > s ? '#4fc38a' : 'var(--border)',marginTop:'11px'}} />}
+                </Fragment>
+              );
+            })}
           </div>
 
           <h2 style={{marginTop:0}}>
@@ -1314,7 +1462,7 @@ export default function HomePage() {
               <label className="field"><span>Notes</span><textarea name="notes" placeholder="Build notes, receiver details, wiring changes..." defaultValue={createBasicData['notes'] ?? ''} /></label>
               <div className="actions">
                 <button className="button" type="submit">Next: Hardware →</button>
-                <button className="button ghost" type="button" onClick={() => setShowTemplates(!showTemplates)}>From template</button>
+                <button className="button ghost" type="button" title="Quick-fill form fields from a known drone model (iFlight, GEPRC, Flywoo, DeepSpaceFPV)" onClick={() => setShowTemplates(!showTemplates)}>From template</button>
               </div>
               {showTemplates && (
                 <div className="edit-panel" style={{marginTop:'10px'}}>
@@ -1523,7 +1671,7 @@ export default function HomePage() {
                 <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'3px 10px',fontSize:'0.83rem'}}>
                   {[
                     ['Name', createBasicData['name']],
-                    ['Status', createBasicData['status'] ?? 'flyable'],
+                    ['Status', STATUS_META[(createBasicData['status'] as DroneStatus) ?? 'flyable']?.label ?? createBasicData['status'] ?? 'Flyable'],
                     ['Frame', createBasicData['frame']],
                     ['Stack', createBasicData['stack']],
                     ['Motors', createBasicData['motors']],
@@ -1591,8 +1739,14 @@ export default function HomePage() {
           </div>
           <div style={{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'10px'}}>
             <span style={{fontSize:'0.72rem',color:'var(--text-muted)',alignSelf:'center',marginRight:'2px'}}>Readiness:</span>
-            {(['all', 'ready', 'needs_backup', 'incomplete', 'grounded'] as const).map((value) => (
-              <button key={value} className={`button ghost${readinessFilter === value ? ' active' : ''}`} type="button" style={{padding:'3px 8px',fontSize:'0.72rem'}} onClick={() => setReadinessFilter(value)}>
+            {([
+              { value: 'all',         tip: 'Show all drones' },
+              { value: 'ready',       tip: 'Flyable with a recent Betaflight snapshot' },
+              { value: 'needs_backup',tip: 'Flyable but no Betaflight snapshot saved yet' },
+              { value: 'incomplete',  tip: 'Flyable but missing key info (AUW, stack, video, radio)' },
+              { value: 'grounded',    tip: 'Not flyable — status is crashed, in build, retired, or for parts' },
+            ] as const).map(({ value, tip }) => (
+              <button key={value} title={tip} className={`button ghost${readinessFilter === value ? ' active' : ''}`} type="button" style={{padding:'3px 8px',fontSize:'0.72rem'}} onClick={() => setReadinessFilter(value)}>
                 {value === 'all' ? 'All' : READINESS_META[value].label}
               </button>
             ))}
@@ -1724,7 +1878,15 @@ export default function HomePage() {
                     </select>
                     <button className="button ghost" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => setEditDroneId(editDroneId === drone.id ? null : drone.id)}>Edit</button>
                     <button className="button ghost" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => handleExportDrone(drone)}>Export JSON</button>
-                    <button className="button danger" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => void handleDeleteDrone(drone)}>Delete</button>
+                    {droneToConfirmDelete === drone.id ? (
+                      <span style={{display:'inline-flex',gap:'4px',alignItems:'center'}}>
+                        <span style={{fontSize:'0.75rem',color:'var(--text-muted)'}}>Delete permanently?</span>
+                        <button className="button danger" type="button" style={{padding:'3px 9px',fontSize:'0.78rem'}} onClick={() => void handleDeleteDrone(drone)}>Yes, delete</button>
+                        <button className="button ghost" type="button" style={{padding:'3px 9px',fontSize:'0.78rem'}} onClick={() => setDroneToConfirmDelete(null)}>Cancel</button>
+                      </span>
+                    ) : (
+                      <button className="button danger" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => setDroneToConfirmDelete(drone.id)}>Delete</button>
+                    )}
                   </div>
                 </div>
               </button>
@@ -1778,13 +1940,14 @@ export default function HomePage() {
                       </label>
                       <label className="field">
                         <span>Radio link</span>
-                        <select name="radio_link" defaultValue={drone.radio_link ?? ''}>
+                        <select key={`radio-${drone.id}`} name="radio_link" defaultValue={drone.radio_link ?? ''}>
                           <option value="">Unknown</option>
                           <option value="ELRS 2.4GHz">ELRS 2.4 GHz</option>
                           <option value="ELRS 900MHz">ELRS 900 MHz</option>
                           <option value="TBS Crossfire">TBS Crossfire</option>
                           <option value="TBS Tracer">TBS Tracer</option>
                           <option value="FrSky D16">FrSky D16</option>
+                          <option value="FrSky ACCST">FrSky ACCST</option>
                           <option value="Spektrum">Spektrum</option>
                           <option value="Other">Other</option>
                         </select>
@@ -1831,7 +1994,7 @@ export default function HomePage() {
                     </div>
                     <label className="field">
                       <span>Notes</span>
-                      <textarea name="notes" defaultValue={drone.notes ?? ''} />
+                      <textarea name="notes" defaultValue={drone.notes ?? ''} placeholder="Build notes, receiver details, wiring changes..." />
                     </label>
                     <div className="actions">
                       <button className="button" type="submit">Save changes</button>
@@ -1891,11 +2054,11 @@ export default function HomePage() {
                 <form className="stack" onSubmit={(event) => void handleCreateSnapshot(event)}>
                   <label className="field">
                     <span>Snapshot name</span>
-                    <input name="name" placeholder="2026-05-08 known-good" required />
+                    <input name="name" placeholder="2026-05-08 known-good or similar" required minLength={5} title="At least 5 characters. Use format like YYYY-MM-DD-description for better organization" />
                   </label>
                   <label className="field">
                     <span>Betaflight version</span>
-                    <input name="betaflight_version" placeholder="4.5.2" />
+                    <input name="betaflight_version" placeholder="4.5.2" pattern="[0-9]{1,2}\.[0-9]+(\.[0-9]+)?" title="Format: major.minor.patch, e.g. 4.5.2 — use a 1-2 digit major version number" />
                   </label>
                   <label className="field">
                     <span>Notes</span>
@@ -1988,11 +2151,11 @@ export default function HomePage() {
                         <form className="stack" style={{marginTop:'8px',padding:'8px',background:'var(--bg)',borderRadius:'6px'}} onSubmit={(e) => void handleUpdateSnapshot(e, snapshot.id, selectedDroneId!)}>
                           <label className="field">
                             <span style={{fontSize:'0.82rem'}}>Name</span>
-                            <input name="name" defaultValue={snapshot.name} required style={{fontSize:'0.85rem'}} />
+                            <input name="name" defaultValue={snapshot.name} required minLength={5} style={{fontSize:'0.85rem'}} title="At least 5 characters. Use format like YYYY-MM-DD-description for better organization" />
                           </label>
                           <label className="field">
                             <span style={{fontSize:'0.82rem'}}>BF version</span>
-                            <input name="betaflight_version" defaultValue={snapshot.betaflight_version ?? ''} placeholder="4.5.2" style={{fontSize:'0.85rem'}} />
+                            <input name="betaflight_version" defaultValue={snapshot.betaflight_version ?? ''} placeholder="4.5.2" pattern="[0-9]{1,2}\.[0-9]+(\.[0-9]+)?" title="Format: major.minor.patch, e.g. 4.5.2 — use a 1-2 digit major version number" style={{fontSize:'0.85rem'}} />
                           </label>
                           <label className="field">
                             <span style={{fontSize:'0.82rem'}}>Notes</span>
@@ -2040,9 +2203,12 @@ export default function HomePage() {
                       <button
                         className="button ghost"
                         type="button"
-                        style={{padding:'4px 12px',fontSize:'0.82rem'}}
-                        onClick={() => void copyToClipboard(file.content)}
-                      >Copy</button>
+                        style={{padding:'4px 12px',fontSize:'0.82rem',color: lastCopiedFileId === file.file_id ? '#4fc38a' : undefined}}
+                        onClick={() => void copyToClipboard(file.content).then(() => {
+                          setLastCopiedFileId(file.file_id);
+                          setTimeout(() => setLastCopiedFileId(null), 2000);
+                        })}
+                      >{lastCopiedFileId === file.file_id ? '✓ Copied' : 'Copy'}</button>
                     </div>
                     {file.parsed_config && Object.keys(file.parsed_config).length > 0 && (
                       <details style={{marginBottom:'6px'}}>
@@ -2054,7 +2220,7 @@ export default function HomePage() {
                             <summary style={{cursor:'pointer',fontSize:'0.85rem',display:'flex',alignItems:'center',gap:'8px'}}>
                               <span style={{textTransform:'capitalize'}}>{section}</span>
                               <span style={{color:'var(--muted)'}}>({entries.length})</span>
-                              <button className="button ghost" type="button" style={{padding:'2px 8px',fontSize:'0.75rem',marginLeft:'auto'}} onClick={(e) => { e.preventDefault(); copySectionAsCLI(entries); }}>Copy {section}</button>
+                              <button className="button ghost" type="button" style={{padding:'2px 8px',fontSize:'0.75rem',marginLeft:'auto',color: lastCopiedSection === section ? '#4fc38a' : undefined}} onClick={(e) => { e.preventDefault(); copySectionAsCLI(entries, section); }}>{lastCopiedSection === section ? '✓ Copied' : `Copy ${section}`}</button>
                             </summary>
                             <table style={{width:'100%',fontSize:'0.82rem',borderCollapse:'collapse',marginTop:'4px'}}>
                               <tbody>
@@ -2083,13 +2249,32 @@ export default function HomePage() {
               <article className="panel span-4">
                 <h3>Add flight note</h3>
                 <form className="stack" onSubmit={(event) => void handleCreateNote(event, 'flights')}>
+                  <div className="two-col">
+                    <label className="field">
+                      <span>Title</span>
+                      <input name="title" placeholder="Morning freestyle session" required />
+                    </label>
+                    <label className="field">
+                      <span>Date</span>
+                      <input name="flight_date" type="date" defaultValue={new Date().toISOString().slice(0,10)} />
+                    </label>
+                  </div>
                   <label className="field">
-                    <span>Title</span>
-                    <input name="title" placeholder="First tuning pack" required />
+                    <span>Outcome</span>
+                    <select name="outcome">
+                      <option value="ok">✓ OK — successful session</option>
+                      <option value="crash">💥 Crash</option>
+                      <option value="emergency_landing">⚠ Emergency landing</option>
+                      <option value="aborted">↩ Aborted</option>
+                    </select>
                   </label>
                   <label className="field">
-                    <span>Note</span>
-                    <textarea name="note" placeholder="How did it fly?" required />
+                    <span>Location</span>
+                    <input name="location" placeholder="Biała Góra park, Warsaw" />
+                  </label>
+                  <label className="field">
+                    <span>Notes</span>
+                    <textarea name="note" placeholder="How did it fly? Observations, issues, improvements..." />
                   </label>
                   <label className="field">
                     <span>Battery used</span>
@@ -2100,15 +2285,43 @@ export default function HomePage() {
                       ))}
                     </select>
                   </label>
-                  <div style={{display:'flex',gap:'8px'}}>
-                    <label className="field" style={{flex:1}}>
+                  <div className="two-col">
+                    <label className="field">
                       <span>Duration (min)</span>
-                      <input name="duration_minutes" type="number" min={1} max={600} placeholder="e.g. 8" />
+                      <input name="duration_minutes" type="number" min={1} max={600} placeholder="8" />
                     </label>
-                    <label className="field" style={{flex:1}}>
+                    <label className="field">
                       <span>Battery used %</span>
-                      <input name="battery_used_percent" type="number" min={1} max={100} placeholder="e.g. 80" />
+                      <input name="battery_used_percent" type="number" min={1} max={100} placeholder="80" />
                     </label>
+                    <label className="field">
+                      <span>Voltage after flight (V)</span>
+                      <input name="battery_voltage_after" type="number" min={0} max={50} step={0.01} placeholder="15.2" />
+                    </label>
+                    <label className="field">
+                      <span>Wind (km/h)</span>
+                      <input name="wind_speed_kmh" type="number" min={0} max={200} placeholder="12" />
+                    </label>
+                    <label className="field">
+                      <span>Temperature (°C)</span>
+                      <input name="temperature_c" type="number" min={-30} max={60} placeholder="22" />
+                    </label>
+                  </div>
+                  <div>
+                    <span style={{fontSize:'0.8rem',color:'var(--text-muted)',display:'block',marginBottom:'5px'}}>Motor temps after session</span>
+                    <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                      {(['m1','m2','m3','m4'] as const).map(m => (
+                        <label key={m} style={{display:'flex',flexDirection:'column',gap:'2px',fontSize:'0.72rem',color:'var(--text-muted)'}}>
+                          {m.toUpperCase()}
+                          <select name={`motor_temp_${m}`} style={{padding:'3px 6px',fontSize:'0.78rem',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)'}}>
+                            <option value="ok">OK</option>
+                            <option value="warm">Warm</option>
+                            <option value="hot">Hot</option>
+                            <option value="burnt">Burnt</option>
+                          </select>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                   <button className="button secondary" type="submit">Add flight note</button>
                 </form>
@@ -2139,23 +2352,31 @@ export default function HomePage() {
                               <button className="button danger" type="button" style={{padding:'2px 8px',fontSize:'0.75rem'}} onClick={() => void handleDeleteNote(selectedDroneId!, note.id, 'flights')}>✕</button>
                             </div>
                           </div>
-                          <p>{note.note}</p>
-                          {(note.battery_id || note.duration_minutes || note.battery_used_percent) && (
-                            <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'4px'}}>
-                              {note.battery_id && batteries.find(b => b.id === note.battery_id) && (
-                                <span className="badge" style={{background:'rgba(96,160,240,0.15)',color:'#60a0f0',fontSize:'0.75rem'}}>
-                                  🔋 {batteries.find(b => b.id === note.battery_id)!.label}
-                                </span>
-                              )}
-                              {note.duration_minutes && (
-                                <span className="badge" style={{fontSize:'0.75rem'}}>⏱ {note.duration_minutes} min</span>
-                              )}
-                              {note.battery_used_percent && (
-                                <span className="badge" style={{fontSize:'0.75rem'}}>⚡ {note.battery_used_percent}% used</span>
-                              )}
-                            </div>
+                          {note.outcome && note.outcome !== 'ok' && (
+                            <span className="badge" style={{fontSize:'0.73rem',background: note.outcome === 'crash' ? 'rgba(224,64,64,0.15)' : 'rgba(240,168,48,0.15)',color: note.outcome === 'crash' ? '#e04040' : '#f0a830',marginBottom:'4px',display:'inline-block'}}>
+                              {note.outcome === 'crash' ? '💥 Crash' : note.outcome === 'emergency_landing' ? '⚠ Emergency landing' : '↩ Aborted'}
+                            </span>
                           )}
-                          <small>{formatDate(note.created_at)}</small>
+                          {note.note && <p>{note.note}</p>}
+                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'4px'}}>
+                            {note.location && <span className="badge" style={{fontSize:'0.73rem'}}>📍 {note.location}</span>}
+                            {note.battery_id && batteries.find(b => b.id === note.battery_id) && (
+                              <span className="badge" style={{background:'rgba(96,160,240,0.15)',color:'#60a0f0',fontSize:'0.73rem'}}>
+                                🔋 {batteries.find(b => b.id === note.battery_id)!.label}
+                              </span>
+                            )}
+                            {note.duration_minutes && <span className="badge" style={{fontSize:'0.73rem'}}>⏱ {note.duration_minutes} min</span>}
+                            {note.battery_used_percent && <span className="badge" style={{fontSize:'0.73rem'}}>⚡ {note.battery_used_percent}%</span>}
+                            {note.battery_voltage_after && <span className="badge" style={{fontSize:'0.73rem'}}>🔋 {note.battery_voltage_after.toFixed(2)}V after</span>}
+                            {note.wind_speed_kmh != null && <span className="badge" style={{fontSize:'0.73rem'}}>💨 {note.wind_speed_kmh} km/h</span>}
+                            {note.temperature_c != null && <span className="badge" style={{fontSize:'0.73rem'}}>🌡 {note.temperature_c}°C</span>}
+                            {note.motor_temps && note.motor_temps !== 'ok,ok,ok,ok' && (
+                              <span className="badge" style={{fontSize:'0.73rem',color: note.motor_temps.includes('hot') || note.motor_temps.includes('burnt') ? '#e04040' : '#f0a830'}}>
+                                ⚙ Motors: {note.motor_temps.split(',').map((t,i) => t !== 'ok' ? `M${i+1}:${t}` : null).filter(Boolean).join(' ')}
+                              </span>
+                            )}
+                          </div>
+                          <small style={{color:'var(--text-muted)'}}>{note.flight_date ?? formatDate(note.created_at)}</small>
                         </>
                       )}
                     </div>
@@ -2193,14 +2414,38 @@ export default function HomePage() {
                   {newMaintEventType === 'crash' && (
                     <>
                       <label className="field">
+                        <span>Crash severity</span>
+                        <select name="crash_severity">
+                          <option value="">Unknown</option>
+                          <option value="minor">Minor — cosmetic, no parts replaced</option>
+                          <option value="moderate">Moderate — 1-2 parts replaced</option>
+                          <option value="severe">Severe — frame + multiple parts</option>
+                          <option value="total_loss">Total loss — write-off</option>
+                        </select>
+                      </label>
+                      <label className="field">
                         <span>Damaged parts (comma-separated)</span>
                         <input name="damage_items" placeholder="front-left arm, motor 1, prop" />
                       </label>
                       <label className="field">
                         <span>Repair cost (PLN)</span>
-                        <input name="repair_cost_pln" type="number" min={0} placeholder="e.g. 150" />
+                        <input name="repair_cost_pln" type="number" min={0} placeholder="150" />
                       </label>
                     </>
+                  )}
+                  {spareStock.length > 0 && (
+                    <details>
+                      <summary style={{cursor:'pointer',fontSize:'0.83rem',color:'var(--text-muted)',marginBottom:'4px'}}>Spare parts used (auto-deducts stock)</summary>
+                      <div style={{display:'flex',flexDirection:'column',gap:'4px',marginTop:'6px'}}>
+                        {spareStock.filter(s => s.quantity > 0).map(item => (
+                          <label key={item.id} style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'0.82rem'}}>
+                            <span style={{flex:1}}>{item.part_name} <span style={{color:'var(--text-muted)'}}>({item.quantity} in stock)</span></span>
+                            <input name={`spare_qty_${item.id}`} type="number" min={0} max={item.quantity} defaultValue={0}
+                              style={{width:'54px',padding:'3px 6px',borderRadius:'4px',border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontSize:'0.82rem'}} />
+                          </label>
+                        ))}
+                      </div>
+                    </details>
                   )}
                   <button className="button secondary" type="submit" style={newMaintEventType === 'crash' ? {background:'rgba(224,64,64,0.15)',color:'#e04040',border:'1px solid rgba(224,64,64,0.3)'} : {}}>
                     {newMaintEventType === 'crash' ? '💥 Log crash' : 'Add maintenance event'}
@@ -2246,6 +2491,11 @@ export default function HomePage() {
                             <p>{note.note}</p>
                             {isCrash && (note.damage_items || note.repair_cost_pln) && (
                               <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'4px',padding:'6px 8px',background:'rgba(224,64,64,0.06)',borderRadius:'4px'}}>
+                                {note.crash_severity && (
+                                  <span className="badge" style={{fontSize:'0.73rem',background:'rgba(224,64,64,0.15)',color:'#e04040'}}>
+                                    {note.crash_severity.replace('_', ' ')}
+                                  </span>
+                                )}
                                 {note.damage_items && (
                                   <span style={{fontSize:'0.8rem',color:'var(--text-muted)'}}>
                                     <strong>Damaged:</strong> {note.damage_items}
@@ -2294,6 +2544,7 @@ export default function HomePage() {
             }
 
             async function handleDeleteChecklistItem(itemId: number) {
+              if (!confirm('Remove this checklist item?')) return;
               try {
                 await apiFetch(`/api/drones/${selectedDrone!.id}/checklist/${itemId}`, { method: 'DELETE' });
                 await loadChecklist(selectedDrone!.id);
@@ -2415,20 +2666,61 @@ export default function HomePage() {
                 {compareResult ? (
                   <div className="stack">
                     <div className="badge-row">
-                      <span className="badge warm">Added: {compareResult.added_lines}</span>
-                      <span className="badge">Removed: {compareResult.removed_lines}</span>
+                      <span className="badge warm">+{compareResult.added_lines} added</span>
+                      <span className="badge">−{compareResult.removed_lines} removed</span>
                     </div>
-                    {compareResult.diff ? (
-                      <pre className="code-box" style={{whiteSpace:'pre-wrap'}}>
-                        {compareResult.diff.split('\n').map((line, i) => {
-                          let cls = '';
-                          if (line.startsWith('+')) cls = 'diff-added';
-                          else if (line.startsWith('-')) cls = 'diff-removed';
-                          else if (line.startsWith('@@')) cls = 'diff-header';
-                          return <span key={i} className={cls || undefined}>{line + '\n'}</span>;
-                        })}
-                      </pre>
-                    ) : <p>No textual diff between the snapshots.</p>}
+                    {compareResult.diff ? (() => {
+                      // Build a map of changed values: key → {from, to}
+                      const changed: Map<string, {from: string; to: string}> = new Map();
+                      const lines = compareResult.diff.split('\n');
+                      const removed: Map<string, string> = new Map();
+                      const added: Map<string, string> = new Map();
+                      for (const line of lines) {
+                        const m = line.match(/^[-+]\s*set\s+(\S+)\s*=\s*(.+)$/);
+                        if (!m) continue;
+                        if (line.startsWith('-')) removed.set(m[1], m[2].trim());
+                        else if (line.startsWith('+')) added.set(m[1], m[2].trim());
+                      }
+                      removed.forEach((fromVal, key) => {
+                        if (added.has(key)) changed.set(key, { from: fromVal, to: added.get(key)! });
+                      });
+                      const PID_KEYS = ['p_roll','p_pitch','p_yaw','i_roll','i_pitch','i_yaw','d_roll','d_pitch','d_yaw','f_roll','f_pitch','f_yaw'];
+                      const pidChanges = PID_KEYS.filter(k => changed.has(k));
+                      return (
+                        <>
+                          {pidChanges.length > 0 && (
+                            <div style={{background:'rgba(96,160,240,0.06)',border:'1px solid rgba(96,160,240,0.2)',borderRadius:'6px',padding:'10px 12px',marginBottom:'8px'}}>
+                              <div style={{fontSize:'0.78rem',fontWeight:700,color:'var(--text-muted)',marginBottom:'7px',letterSpacing:'0.05em'}}>PID CHANGES</div>
+                              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:'5px'}}>
+                                {pidChanges.map(k => {
+                                  const {from, to} = changed.get(k)!;
+                                  const delta = parseFloat(to) - parseFloat(from);
+                                  const color = delta > 0 ? '#4fc38a' : '#e04040';
+                                  return (
+                                    <div key={k} style={{display:'flex',gap:'5px',alignItems:'center',fontSize:'0.81rem',padding:'3px 6px',borderRadius:'4px',background:'var(--surface2)'}}>
+                                      <span style={{fontWeight:600,minWidth:'60px',textTransform:'uppercase',fontSize:'0.73rem',color:'var(--text-muted)'}}>{k.replace('_',' ')}</span>
+                                      <span style={{color:'var(--text-muted)'}}>{from}</span>
+                                      <span>→</span>
+                                      <span style={{fontWeight:700,color}}>{to}</span>
+                                      <span style={{fontSize:'0.72rem',color,marginLeft:'2px'}}>({delta > 0 ? '+' : ''}{delta.toFixed(0)})</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          <pre className="code-box" style={{whiteSpace:'pre-wrap',fontSize:'0.78rem'}}>
+                            {lines.map((line, i) => {
+                              let cls = '';
+                              if (line.startsWith('+')) cls = 'diff-added';
+                              else if (line.startsWith('-')) cls = 'diff-removed';
+                              else if (line.startsWith('@@')) cls = 'diff-header';
+                              return <span key={i} className={cls || undefined}>{line + '\n'}</span>;
+                            })}
+                          </pre>
+                        </>
+                      );
+                    })() : <p>No textual diff between the snapshots.</p>}
                   </div>
                 ) : (
                   <p style={{color:'var(--text-muted)'}}>No comparison run yet. Select two snapshots and click Compare.</p>
@@ -2480,8 +2772,28 @@ export default function HomePage() {
               <input name="purchase_date" type="date" />
             </label>
             <label className="field">
+              <span>Assigned drone (optional)</span>
+              <select name="assigned_drone_id">
+                <option value="">— not assigned —</option>
+                {drones.filter(d => d.status === 'flyable' || d.status === 'in_build').map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </label>
+            <details>
+              <summary style={{cursor:'pointer',fontSize:'0.83rem',color:'var(--text-muted)',marginBottom:'4px'}}>Internal Resistance per cell (mΩ)</summary>
+              <div className="two-col" style={{marginTop:'6px'}}>
+                {[1,2,3,4,5,6].map(n => (
+                  <label key={n} className="field">
+                    <span>C{n}</span>
+                    <input name={`ir_c${n}_mohm`} type="number" min={0} max={200} placeholder="e.g. 3" />
+                  </label>
+                ))}
+              </div>
+            </details>
+            <label className="field">
               <span>Notes</span>
-              <textarea name="notes" placeholder="Storage voltage, IR notes..." />
+              <textarea name="notes" placeholder="Storage voltage, charger settings, observations..." />
             </label>
             <div className="actions">
               <button className="button" type="submit">Add battery</button>
@@ -2491,7 +2803,7 @@ export default function HomePage() {
 
         <article className="panel span-8">
           <h2>Battery fleet</h2>
-          {batteries.length === 0 ? <p>No batteries tracked yet.</p> : (
+          {batteries.length === 0 ? <p style={{color:'var(--text-muted)'}}>No batteries tracked yet. Add your first pack using the form on the left.</p> : (
             <div className="battery-list">
               {batteries.map((bat) => {
                 const health = getBatteryHealth(bat);
@@ -2517,15 +2829,52 @@ export default function HomePage() {
                     {bat.purchase_date ? <span className="badge">Bought: {bat.purchase_date}</span> : null}
                     <span className="badge" style={{background:statusMeta.bg,color:statusMeta.color}}>{statusMeta.label}</span>
                     {bat.is_puffed ? <span className="badge" style={{background:'rgba(224,64,64,0.2)',color:'#e04040'}}>Puffed</span> : null}
-                    {bat.internal_resistance_mohm ? <span className="badge">IR: {bat.internal_resistance_mohm}mΩ</span> : null}
+                    {bat.internal_resistance_mohm ? <span className="badge">IR avg: {bat.internal_resistance_mohm}mΩ</span> : null}
+                    {bat.assigned_drone_id && drones.find(d => d.id === bat.assigned_drone_id) && (
+                      <span className="badge" style={{background:'rgba(79,195,138,0.12)',color:'#4fc38a',fontSize:'0.73rem'}}>
+                        🚁 {drones.find(d => d.id === bat.assigned_drone_id)!.name}
+                      </span>
+                    )}
+                    {bat.last_charged_at && (
+                      <span className="badge" style={{fontSize:'0.73rem'}}>
+                        Last charged: {new Date(bat.last_charged_at).toLocaleDateString('en-GB',{month:'short',day:'numeric'})}
+                      </span>
+                    )}
                   </div>
+                  {(() => {
+                    const cells = [bat.ir_c1_mohm, bat.ir_c2_mohm, bat.ir_c3_mohm, bat.ir_c4_mohm, bat.ir_c5_mohm, bat.ir_c6_mohm]
+                      .filter((_, i) => i < bat.cell_count);
+                    const hasIR = cells.some(c => c != null);
+                    if (!hasIR) return null;
+                    const maxIR = Math.max(...cells.filter((c): c is number => c != null));
+                    return (
+                      <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginTop:'4px'}}>
+                        {cells.map((ir, i) => (
+                          <span key={i} style={{
+                            fontSize:'0.72rem',padding:'1px 6px',borderRadius:'4px',
+                            background: ir == null ? 'var(--surface2)' : ir > 8 ? 'rgba(224,64,64,0.15)' : ir > 5 ? 'rgba(240,168,48,0.15)' : 'rgba(79,195,138,0.12)',
+                            color: ir == null ? 'var(--text-muted)' : ir > 8 ? '#e04040' : ir > 5 ? '#f0a830' : '#4fc38a',
+                          }}>C{i+1}: {ir != null ? `${ir}mΩ` : '—'}</span>
+                        ))}
+                        {maxIR > 8 && <span style={{fontSize:'0.72rem',color:'#e04040'}}>⚠ High IR — consider retiring</span>}
+                      </div>
+                    );
+                  })()}
                   {bat.notes ? <p style={{fontSize:'0.84rem',marginTop:'4px'}}>{bat.notes}</p> : null}
                   <div className="actions">
                     <button className="button ghost" type="button" onClick={() => void incrementCycles(bat.id, bat.cycle_count)}>+1 Cycle</button>
                     {!bat.is_puffed && <button className="button ghost" type="button" style={{color:'#f0a830'}} onClick={() => void apiFetch<Battery>(`/api/batteries/${bat.id}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_puffed:true})}).then(() => apiFetch<Battery[]>('/api/batteries').then(setBatteries))}>Mark puffed</button>}
                     {bat.batt_status !== 'retired' && <button className="button ghost" type="button" style={{color:'#7a8599'}} onClick={() => void apiFetch<Battery>(`/api/batteries/${bat.id}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({batt_status:'retired'})}).then(() => apiFetch<Battery[]>('/api/batteries').then(setBatteries))}>Retire</button>}
                     <button className="button ghost" type="button" style={{padding:'4px 10px',fontSize:'0.78rem'}} onClick={() => setQrModal({entityType:'battery',id:bat.id,label:bat.label})}>QR</button>
-                    <button className="button ghost" type="button" style={{color:'#b72b0f'}} onClick={() => void deleteBattery(bat.id, bat.label)}>Remove</button>
+                    {batteryToConfirmDelete === bat.id ? (
+                      <span style={{display:'inline-flex',gap:'4px',alignItems:'center'}}>
+                        <span style={{fontSize:'0.75rem',color:'var(--text-muted)'}}>Remove permanently?</span>
+                        <button className="button danger" type="button" style={{padding:'3px 9px',fontSize:'0.78rem'}} onClick={() => void deleteBattery(bat.id, bat.label)}>Yes</button>
+                        <button className="button ghost" type="button" style={{padding:'3px 9px',fontSize:'0.78rem'}} onClick={() => setBatteryToConfirmDelete(null)}>Cancel</button>
+                      </span>
+                    ) : (
+                      <button className="button ghost" type="button" style={{color:'#b72b0f'}} onClick={() => setBatteryToConfirmDelete(bat.id)}>Remove</button>
+                    )}
                   </div>
                 </div>
                 );
@@ -2561,8 +2910,7 @@ export default function HomePage() {
                     onClick={() => void apiFetch<SpareStock>(`/api/spare-stock/${item.id}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({quantity: Math.max(0, item.quantity - 1)})})
                       .then(() => apiFetch<SpareStock[]>('/api/spare-stock').then(setSpareStock))}>-1</button>
                   <button className="button danger" style={{padding:'2px 8px',fontSize:'0.78rem'}} type="button"
-                    onClick={() => void apiFetch(`/api/spare-stock/${item.id}`, {method:'DELETE'})
-                      .then(() => setSpareStock(prev => prev.filter(s => s.id !== item.id)))}>✕</button>
+                    onClick={() => { if (!confirm(`Remove "${item.part_name}" from inventory?`)) return; void apiFetch(`/api/spare-stock/${item.id}`, {method:'DELETE'}).then(() => setSpareStock(prev => prev.filter(s => s.id !== item.id))); }}>✕</button>
                 </div>
               ))}
             </div>
@@ -2576,8 +2924,14 @@ export default function HomePage() {
           }}>
             <input name="part_name" placeholder="Part name" required style={{flex:'2 1 150px',padding:'6px 10px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--input-bg)',color:'var(--text)'}}/>
             <input name="category" placeholder="Category (optional)" style={{flex:'1 1 120px',padding:'6px 10px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--input-bg)',color:'var(--text)'}}/>
-            <input name="quantity" type="number" min="0" defaultValue="1" placeholder="Qty" style={{width:'70px',padding:'6px 10px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--input-bg)',color:'var(--text)'}}/>
-            <input name="threshold" type="number" min="0" defaultValue="1" placeholder="Low at" style={{width:'80px',padding:'6px 10px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--input-bg)',color:'var(--text)'}}/>
+            <label style={{display:'flex',flexDirection:'column',gap:'2px',fontSize:'0.72rem',color:'var(--text-muted)'}}>
+              Quantity
+              <input name="quantity" type="number" min="0" defaultValue="1" style={{width:'70px',padding:'6px 10px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--input-bg)',color:'var(--text)'}}/>
+            </label>
+            <label style={{display:'flex',flexDirection:'column',gap:'2px',fontSize:'0.72rem',color:'var(--text-muted)'}}>
+              Low stock alert at
+              <input name="threshold" type="number" min="0" defaultValue="1" style={{width:'90px',padding:'6px 10px',borderRadius:'6px',border:'1px solid var(--border)',background:'var(--input-bg)',color:'var(--text)'}}/>
+            </label>
             <button className="button primary" type="submit">Add part</button>
           </form>
         </div>
