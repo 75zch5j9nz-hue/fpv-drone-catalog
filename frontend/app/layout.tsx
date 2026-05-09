@@ -6,13 +6,12 @@ import { ReactNode, useEffect } from 'react';
 export default function RootLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then((reg) => {
+      navigator.serviceWorker.register('/sw.js').then(() => {
         navigator.serviceWorker.addEventListener('message', (e) => {
           if (e.data?.type === 'SYNC_COMPLETE') {
             (window as unknown as Record<string, (...a: unknown[]) => unknown>).__fpvSyncComplete?.(e.data.remaining);
           }
         });
-        void reg;
       }).catch(() => {});
     }
   }, []);
@@ -20,8 +19,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        {/* Next.js injects charset + viewport automatically — only PWA-specific tags here */}
         <meta name="theme-color" content="#60a0f0" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
