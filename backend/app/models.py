@@ -203,6 +203,11 @@ class Snapshot(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_current: Mapped[bool] = mapped_column(Boolean, default=False)
     is_known_good: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Cold backup metadata (for Factory CLI dumps from manufacturer scraper)
+    is_cold_backup: Mapped[bool] = mapped_column(Boolean, default=False)
+    cold_backup_source: Mapped[str | None] = mapped_column(String(60), nullable=True)  # 'manufacturer'|'community'|'manual'
+    cold_backup_url: Mapped[str | None] = mapped_column(String(600), nullable=True)
+    cold_backup_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)  # sha256
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     drone: Mapped[Drone] = relationship(back_populates="snapshots")

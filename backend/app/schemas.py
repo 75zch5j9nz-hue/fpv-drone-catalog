@@ -428,6 +428,10 @@ class SnapshotOut(BaseModel):
     notes: str | None
     is_current: bool
     is_known_good: bool
+    is_cold_backup: bool = False
+    cold_backup_source: str | None = None
+    cold_backup_url: str | None = None
+    cold_backup_hash: str | None = None
     created_at: datetime
     files: list[StoredFileOut]
 

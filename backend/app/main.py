@@ -123,6 +123,12 @@ def _run_migrations() -> None:
         ("damage_items", "TEXT"),
         ("repair_cost_pln", "INTEGER"),
     ]
+    new_snapshot_columns = [
+        ("is_cold_backup", "BOOLEAN DEFAULT FALSE"),
+        ("cold_backup_source", "VARCHAR(60)"),
+        ("cold_backup_url", "VARCHAR(600)"),
+        ("cold_backup_hash", "VARCHAR(64)"),
+    ]
     new_battery_columns = [
         ("batt_status", "VARCHAR(16) DEFAULT 'active'"),
         ("is_puffed", "BOOLEAN DEFAULT FALSE"),
@@ -163,6 +169,8 @@ def _run_migrations() -> None:
             conn.execute(text(f"ALTER TABLE maintenance_events ADD COLUMN IF NOT EXISTS {col} {typedef}"))
         for col, typedef in new_battery_columns:
             conn.execute(text(f"ALTER TABLE batteries ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+        for col, typedef in new_snapshot_columns:
+            conn.execute(text(f"ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS {col} {typedef}"))
         # For each drone that has snapshots but none marked current, mark the newest one
         conn.execute(text("""
             UPDATE snapshots SET is_current = TRUE
@@ -1880,18 +1888,43 @@ async def import_bf_preset(drone_id: int, payload: dict, db: Session = Depends(g
     if m:
         bf_ver = m.group(1)
 
+    # Compute hash for dedup
+    import hashlib as _hashlib2
+    content_hash = _hashlib2.sha256(content.encode()).hexdigest()
+
+    # Check if already imported (dedup by hash)
+    existing = db.execute(
+        select(Snapshot).where(
+            Snapshot.drone_id == drone.id,
+            Snapshot.cold_backup_hash == content_hash,
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return existing
+
+    # Determine source type from URL
+    source_type = "manufacturer"
+    if "github" in preset_url or "raw.githubusercontent" in preset_url:
+        source_type = "community"
+    elif "intofpv" in preset_url or "rcgroups" in preset_url:
+        source_type = "community"
+
     # Create snapshot marked as cold backup
     today = str(datetime.utcnow())[:10]
-    snap_name = f"[Preset] {preset_title} — {today}"
-    base_slug = safe_slug(snap_name, f"preset-{drone.id}")
+    snap_name = f"[Factory] {preset_title} — {today}"
+    base_slug = safe_slug(snap_name, f"factory-{drone.id}")
     snap = Snapshot(
         drone_id=drone.id,
         name=snap_name,
         slug=next_unique_slug(db, Snapshot, base_slug, scope_column=Snapshot.drone_id, scope_value=drone.id),
         betaflight_version=bf_ver,
-        notes=f"Cold backup — imported from betaflight-presets.\nSource: {preset_url}",
+        notes=f"Factory CLI cold backup.\nSource: {preset_url}",
         is_current=False,
         is_known_good=False,
+        is_cold_backup=True,
+        cold_backup_source=source_type,
+        cold_backup_url=preset_url,
+        cold_backup_hash=content_hash,
     )
     db.add(snap)
     db.flush()
@@ -1913,8 +1946,270 @@ async def import_bf_preset(drone_id: int, payload: dict, db: Session = Depends(g
         sha256=sha256_hex(content.encode()),
         size_bytes=len(content.encode()),
         parse_status="parsed" if parsed else "unsupported",
-        text_excerpt=excerpt_text(content),
+        text_excerpt=excerpt_text(content.encode("utf-8") if isinstance(content, str) else content, FileRole.diff_all),
     )
     db.add(sf)
     db.commit()
     return get_snapshot_or_404(db, snap.id)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FACTORY CLI ARCHIVE — dedicated cold-backup endpoints
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/drones/{drone_id}/factory-cli", response_model=list[SnapshotOut])
+def list_factory_cli(drone_id: int, db: Session = Depends(get_db)) -> list[Snapshot]:
+    """List cold-backup snapshots for a drone, newest first."""
+    get_drone_or_404(db, drone_id)
+    snaps = list(db.execute(
+        select(Snapshot)
+        .options(selectinload(Snapshot.files))
+        .where(Snapshot.drone_id == drone_id, Snapshot.is_cold_backup == True)
+        .order_by(Snapshot.created_at.desc())
+    ).scalars())
+    return snaps
+
+
+@app.get("/api/factory-cli")
+def list_all_factory_cli(manufacturer: str | None = None, bf_version: str | None = None, db: Session = Depends(get_db)) -> dict:
+    """Global archive view across all drones with optional filters."""
+    q = (
+        select(Snapshot, Drone)
+        .join(Drone, Snapshot.drone_id == Drone.id)
+        .where(Snapshot.is_cold_backup == True)
+        .order_by(Snapshot.created_at.desc())
+    )
+    if bf_version:
+        q = q.where(Snapshot.betaflight_version.like(f"{bf_version}%"))
+    rows = list(db.execute(q).all())
+    if manufacturer:
+        rows = [r for r in rows if manufacturer.lower() in (r[1].name or "").lower()]
+    grouped: dict[int, dict] = {}
+    for snap, drone in rows:
+        key = drone.id
+        if key not in grouped:
+            grouped[key] = {
+                "drone_id": drone.id,
+                "drone_name": drone.name,
+                "category": drone.category,
+                "image_url": drone.image_url,
+                "backups": [],
+            }
+        grouped[key]["backups"].append({
+            "id": snap.id,
+            "name": snap.name,
+            "betaflight_version": snap.betaflight_version,
+            "source": snap.cold_backup_source,
+            "url": snap.cold_backup_url,
+            "hash": snap.cold_backup_hash,
+            "created_at": str(snap.created_at),
+        })
+    return {"total_drones": len(grouped), "total_backups": len(rows), "drones": list(grouped.values())}
+
+
+@app.post("/api/drones/{drone_id}/factory-cli/upload", response_model=SnapshotOut, status_code=201)
+async def upload_factory_cli(
+    drone_id: int,
+    file: UploadFile = File(...),
+    notes: str | None = Form(default=None),
+    bf_version: str | None = Form(default=None),
+    source: str = Form(default="manual"),
+    db: Session = Depends(get_db),
+) -> Snapshot:
+    """Manual upload of a factory CLI dump (when scraper can't find it)."""
+    drone = get_drone_or_404(db, drone_id)
+    content = (await file.read()).decode("utf-8", errors="replace")
+
+    import hashlib as _hashlib3
+    content_hash = _hashlib3.sha256(content.encode()).hexdigest()
+    # Dedup
+    existing = db.execute(
+        select(Snapshot).where(
+            Snapshot.drone_id == drone.id,
+            Snapshot.cold_backup_hash == content_hash,
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return existing
+
+    # Auto-detect BF version
+    detected_ver = bf_version
+    if not detected_ver:
+        m = _BF_VERSION_RE.search(content)
+        if m:
+            detected_ver = m.group(1)
+
+    today = str(datetime.utcnow())[:10]
+    snap_name = f"[Factory] {file.filename or 'manual upload'} — {today}"
+    base_slug = safe_slug(snap_name, f"factory-{drone.id}")
+    snap = Snapshot(
+        drone_id=drone.id,
+        name=snap_name,
+        slug=next_unique_slug(db, Snapshot, base_slug, scope_column=Snapshot.drone_id, scope_value=drone.id),
+        betaflight_version=detected_ver,
+        notes=notes or f"Manual factory CLI upload from {file.filename}",
+        is_cold_backup=True,
+        cold_backup_source=source,
+        cold_backup_hash=content_hash,
+    )
+    db.add(snap)
+    db.flush()
+
+    # Save file
+    relative_path, stored_filename = build_relative_path(
+        drone.slug, snap.slug, FileRole.diff_all, file.filename or "factory-cli.txt"
+    )
+    write_bytes(settings.upload_path / relative_path, content.encode("utf-8"))
+    parsed = parse_betaflight_config(content) or None
+    sf = StoredFile(
+        drone_id=drone.id,
+        snapshot_id=snap.id,
+        role=FileRole.diff_all,
+        original_filename=file.filename,
+        stored_filename=stored_filename,
+        relative_path=str(relative_path),
+        mime_type="text/plain",
+        sha256=content_hash,
+        size_bytes=len(content.encode()),
+        parse_status="parsed" if parsed else "unsupported",
+        text_excerpt=excerpt_text(content.encode("utf-8") if isinstance(content, str) else content, FileRole.diff_all),
+    )
+    db.add(sf)
+    db.commit()
+    return get_snapshot_or_404(db, snap.id)
+
+
+@app.post("/api/drones/{drone_id}/factory-cli/auto-fetch")
+async def auto_fetch_factory_cli(drone_id: int, db: Session = Depends(get_db)) -> dict:
+    """Auto-fetch all curated manufacturer presets matching this drone."""
+    drone = get_drone_or_404(db, drone_id)
+    drone_name_lower = drone.name.lower()
+    fetched: list[dict] = []
+    skipped: list[dict] = []
+    failed: list[dict] = []
+
+    matching = [p for p in _MANUFACTURER_PRESETS if p["drone_hint"].lower() in drone_name_lower]
+
+    for preset in matching:
+        try:
+            req = urllib.request.Request(preset["url"], headers={"User-Agent": "FPV-Catalog/1.0"})
+            content = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", errors="replace")
+            import hashlib as _h
+            ch = _h.sha256(content.encode()).hexdigest()
+            existing = db.execute(
+                select(Snapshot).where(Snapshot.drone_id == drone.id, Snapshot.cold_backup_hash == ch)
+            ).scalar_one_or_none()
+            if existing:
+                skipped.append({"title": preset["title"], "reason": "already imported"})
+                continue
+            bf_ver = None
+            m = _BF_VERSION_RE.search(content)
+            if m:
+                bf_ver = m.group(1)
+            today = str(datetime.utcnow())[:10]
+            snap_name = f"[Factory] {preset['title']} — {today}"
+            base_slug = safe_slug(snap_name, f"factory-{drone.id}")
+            snap = Snapshot(
+                drone_id=drone.id,
+                name=snap_name,
+                slug=next_unique_slug(db, Snapshot, base_slug, scope_column=Snapshot.drone_id, scope_value=drone.id),
+                betaflight_version=bf_ver,
+                notes=f"Auto-fetched from {preset['source']}.\nURL: {preset['url']}",
+                is_cold_backup=True,
+                cold_backup_source="manufacturer",
+                cold_backup_url=preset["url"],
+                cold_backup_hash=ch,
+            )
+            db.add(snap)
+            db.flush()
+            relative_path, stored_filename = build_relative_path(
+                drone.slug, snap.slug, FileRole.diff_all, "preset.txt"
+            )
+            write_bytes(settings.upload_path / relative_path, content.encode("utf-8"))
+            sf = StoredFile(
+                drone_id=drone.id, snapshot_id=snap.id, role=FileRole.diff_all,
+                original_filename="preset.txt", stored_filename=stored_filename,
+                relative_path=str(relative_path), mime_type="text/plain",
+                sha256=ch, size_bytes=len(content.encode()),
+                parse_status="parsed", text_excerpt=excerpt_text(content.encode("utf-8") if isinstance(content, str) else content, FileRole.diff_all),
+            )
+            db.add(sf)
+            db.commit()
+            fetched.append({"title": preset["title"], "snapshot_id": snap.id, "bf_version": bf_ver})
+        except Exception as e:
+            failed.append({"title": preset["title"], "error": str(e)[:120]})
+
+    return {
+        "drone": drone.name,
+        "matching_presets": len(matching),
+        "fetched": fetched,
+        "skipped": skipped,
+        "failed": failed,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HTML SCRAPER for manufacturer download pages (no external deps — stdlib only)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/drones/{drone_id}/factory-cli/scrape-manufacturer")
+async def scrape_manufacturer_page(drone_id: int, db: Session = Depends(get_db)) -> dict:
+    """Scrape the drone's manufacturer download page for .txt CLI files."""
+    drone = get_drone_or_404(db, drone_id)
+
+    # Determine manufacturer URL pattern from drone name
+    name_lower = drone.name.lower()
+    candidate_urls: list[str] = []
+    if "geprc" in name_lower:
+        # GEPRC has model-specific download pages
+        slug = name_lower.replace("geprc ", "").split(" ")[0]
+        candidate_urls = [
+            f"https://geprc.com/downloads/{slug}/",
+            "https://geprc.com/downloads/",
+        ]
+    elif "iflight" in name_lower or "nazgul" in name_lower:
+        candidate_urls = [
+            "https://iflightrc.freshdesk.com/support/solutions/articles/48001148115",
+        ]
+    elif "flywoo" in name_lower or "explorer" in name_lower:
+        candidate_urls = [
+            "https://flywoo.net/pages/explorer-lr4-download-center",
+            "https://flywoo.net/pages/electronic-download-center",
+        ]
+
+    found_links: list[dict] = []
+    for url in candidate_urls:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 FPV-Catalog/1.0"})
+            html = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", errors="replace")
+            # Extract .txt and .zip links via regex (no bs4 dependency)
+            import re as _re
+            link_re = _re.compile(r'href=["\']([^"\']+\.(?:txt|zip|cli))["\']', _re.IGNORECASE)
+            for match in link_re.findall(html):
+                full_url = match if match.startswith("http") else f"https://{urllib.request.urlparse(url).netloc}{match}" if match.startswith("/") else url.rstrip("/") + "/" + match
+                # Try to extract title from filename or surrounding context
+                fname = full_url.split("/")[-1]
+                # Filter: must look like a BF/CLI file
+                if any(kw in fname.lower() for kw in ("cli", "betaflight", "bf", "dump", "config", "preset")) or fname.lower().endswith(".txt"):
+                    found_links.append({
+                        "url": full_url,
+                        "filename": fname,
+                        "source_page": url,
+                    })
+        except Exception as e:
+            continue  # Try next candidate URL
+
+    # Deduplicate by URL
+    seen = set()
+    unique_links = []
+    for link in found_links:
+        if link["url"] not in seen:
+            seen.add(link["url"])
+            unique_links.append(link)
+
+    return {
+        "drone": drone.name,
+        "candidate_urls": candidate_urls,
+        "found": len(unique_links),
+        "links": unique_links[:50],
+    }

@@ -29,6 +29,10 @@ type Snapshot = {
   notes: string | null;
   is_current: boolean;
   is_known_good: boolean;
+  is_cold_backup?: boolean;
+  cold_backup_source?: string | null;
+  cold_backup_url?: string | null;
+  cold_backup_hash?: string | null;
   created_at: string;
   files: StoredFile[];
 };
@@ -485,7 +489,10 @@ export default function HomePage() {
   // Hardware history panel for a selected drone
   const [showHwHistory, setShowHwHistory] = useState<number | null>(null); // drone id
   const [hwHistory, setHwHistory] = useState<InstalledComponent[]>([]);
-  const [droneTab, setDroneTab] = useState<'snapshots' | 'flight-log' | 'maintenance' | 'compare' | 'checklist' | 'photos' | 'elrs' | 'stats'>('snapshots');
+  const [droneTab, setDroneTab] = useState<'snapshots' | 'flight-log' | 'maintenance' | 'compare' | 'checklist' | 'photos' | 'elrs' | 'stats' | 'factory'>('snapshots');
+  // Factory CLI cold backups
+  const [factoryBackups, setFactoryBackups] = useState<Record<number, Snapshot[]>>({});
+  const [factoryFetchStatus, setFactoryFetchStatus] = useState<string>('');
   // #7 Flight stats
   const [droneStats, setDroneStats] = useState<Record<number, DroneFlightStats>>({});
   // #8 Maintenance alerts
@@ -2163,7 +2170,8 @@ export default function HomePage() {
             </div>
             <div className="dw-tabs">
               {([
-                ['snapshots', `Snapshots (${selectedDrone.snapshots.length})`],
+                ['snapshots', `Snapshots (${selectedDrone.snapshots.filter(s => !s.is_cold_backup).length})`],
+                ['factory', `🏭 Factory CLI (${selectedDrone.snapshots.filter(s => s.is_cold_backup).length})`],
                 ['flight-log', `Flight Log (${selectedDrone.flight_notes.length})`],
                 ['maintenance', `Maintenance (${selectedDrone.maintenance_events.length})`],
                 ['checklist', `Checklist (${(checklistItems[selectedDrone.id] ?? []).length})`],
@@ -2187,6 +2195,9 @@ export default function HomePage() {
                     }
                     if (tab === 'elrs') {
                       apiFetch<ElrsProfile[]>(`/api/elrs-profiles?drone_id=${selectedDrone.id}`).then(setElrsProfiles).catch(() => {});
+                    }
+                    if (tab === 'factory') {
+                      apiFetch<Snapshot[]>(`/api/drones/${selectedDrone.id}/factory-cli`).then(b => setFactoryBackups(prev => ({...prev, [selectedDrone.id]: b}))).catch(() => {});
                     }
                   }}
                 >
@@ -3223,6 +3234,159 @@ export default function HomePage() {
               </article>
             </section>
           )}
+
+          {/* ── FACTORY CLI TAB (cold backup archive) ── */}
+          {droneTab === 'factory' && (() => {
+            const backups = factoryBackups[selectedDrone.id] ?? selectedDrone.snapshots.filter(s => s.is_cold_backup);
+            const otherSnaps = selectedDrone.snapshots.filter(s => !s.is_cold_backup);
+            return (
+              <section className="content-grid">
+                {/* Status / actions panel */}
+                <article className="panel span-12">
+                  <div style={{display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap',marginBottom:'10px'}}>
+                    <h3 style={{margin:0}}>🏭 Factory CLI Cold Backup</h3>
+                    <span style={{fontSize:'0.8rem',color:'var(--text-muted)'}}>
+                      Official manufacturer CLI dumps — never deleted, used as restore reference
+                    </span>
+                  </div>
+                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center',marginBottom:'8px'}}>
+                    <span className={`badge ${backups.length > 0 ? '' : 'warm'}`} style={{background: backups.length > 0 ? 'rgba(79,195,138,0.15)' : 'rgba(240,168,48,0.15)', color: backups.length > 0 ? '#4fc38a' : '#f0a830'}}>
+                      {backups.length > 0 ? `✓ ${backups.length} backup${backups.length>1?'s':''} archived` : '⚠ No factory backup yet'}
+                    </span>
+                    <button className="button" type="button"
+                      onClick={async () => {
+                        setFactoryFetchStatus('Searching manufacturer pages…');
+                        try {
+                          const r = await apiFetch<{fetched: Array<{title:string;snapshot_id:number;bf_version:string|null}>; skipped: unknown[]; failed: Array<{title:string;error:string}>}>(`/api/drones/${selectedDrone.id}/factory-cli/auto-fetch`, {method:'POST'});
+                          setFactoryFetchStatus(`Fetched ${r.fetched.length} new · ${r.skipped.length} already had · ${r.failed.length} failed`);
+                          await loadDrones(selectedDrone.id);
+                          const list = await apiFetch<Snapshot[]>(`/api/drones/${selectedDrone.id}/factory-cli`);
+                          setFactoryBackups(prev => ({...prev, [selectedDrone.id]: list}));
+                        } catch (e) {
+                          setFactoryFetchStatus(`Failed: ${(e as Error).message}`);
+                        }
+                      }}>
+                      🔄 Auto-fetch from manufacturer
+                    </button>
+                    <label className="button ghost" style={{cursor:'pointer'}}>
+                      📤 Upload manual CLI dump
+                      <input type="file" accept=".txt,.cli,.config" style={{display:'none'}} onChange={async e => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        fd.append('source', 'manual');
+                        const notes = prompt('Notes (e.g. "Downloaded from Flywoo Discord")') || '';
+                        if (notes) fd.append('notes', notes);
+                        setFactoryFetchStatus('Uploading…');
+                        try {
+                          await apiFetch(`/api/drones/${selectedDrone.id}/factory-cli/upload`, {method:'POST', body:fd});
+                          await loadDrones(selectedDrone.id);
+                          const list = await apiFetch<Snapshot[]>(`/api/drones/${selectedDrone.id}/factory-cli`);
+                          setFactoryBackups(prev => ({...prev, [selectedDrone.id]: list}));
+                          setFactoryFetchStatus('Manual upload added.');
+                        } catch (err) { setFactoryFetchStatus(`Upload failed: ${(err as Error).message}`); }
+                        e.target.value = '';
+                      }} />
+                    </label>
+                    <button className="button ghost" type="button"
+                      onClick={async () => {
+                        setFactoryFetchStatus('Scraping manufacturer download page…');
+                        try {
+                          const r = await apiFetch<{found:number; links:Array<{url:string;filename:string}>; candidate_urls:string[]}>(`/api/drones/${selectedDrone.id}/factory-cli/scrape-manufacturer`);
+                          if (r.found === 0) {
+                            setFactoryFetchStatus(`No CLI files found on ${r.candidate_urls.join(', ')}`);
+                          } else {
+                            const choices = r.links.map((l, i) => `${i+1}. ${l.filename}`).join('\n');
+                            const choice = prompt(`Found ${r.found} files. Enter number to import:\n\n${choices}`);
+                            if (choice) {
+                              const idx = parseInt(choice, 10) - 1;
+                              const link = r.links[idx];
+                              if (link) {
+                                await apiFetch(`/api/drones/${selectedDrone.id}/presets/import`, {method:'POST', body: JSON.stringify({url:link.url, title:link.filename})});
+                                await loadDrones(selectedDrone.id);
+                                const list = await apiFetch<Snapshot[]>(`/api/drones/${selectedDrone.id}/factory-cli`);
+                                setFactoryBackups(prev => ({...prev, [selectedDrone.id]: list}));
+                                setFactoryFetchStatus(`Imported: ${link.filename}`);
+                              }
+                            }
+                          }
+                        } catch (e) { setFactoryFetchStatus(`Scrape failed: ${(e as Error).message}`); }
+                      }}>
+                      🔍 Scan manufacturer page
+                    </button>
+                  </div>
+                  {factoryFetchStatus && <p style={{fontSize:'0.78rem',color:'var(--text-muted)',margin:0}}>{factoryFetchStatus}</p>}
+                </article>
+
+                {/* Backup list */}
+                <article className="panel span-12">
+                  <h4 style={{margin:'0 0 8px',fontSize:'0.92rem'}}>Archived backups</h4>
+                  {backups.length === 0 ? (
+                    <div style={{textAlign:'center',padding:'30px 16px',color:'var(--text-muted)'}}>
+                      <div style={{fontSize:'2rem',marginBottom:'6px'}}>📚</div>
+                      <p style={{margin:0}}>No factory CLI dumps yet for {selectedDrone.name}.</p>
+                      <p style={{fontSize:'0.85rem',margin:'4px 0 0'}}>Click "Auto-fetch from manufacturer" — works for GEPRC drones (curated URLs included).</p>
+                    </div>
+                  ) : (
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.85rem'}}>
+                      <thead>
+                        <tr style={{background:'var(--surface2)',borderBottom:'1px solid var(--border)'}}>
+                          <th style={{textAlign:'left',padding:'6px 8px',fontSize:'0.73rem',color:'var(--text-muted)'}}>FETCHED</th>
+                          <th style={{textAlign:'left',padding:'6px 8px',fontSize:'0.73rem',color:'var(--text-muted)'}}>BF VERSION</th>
+                          <th style={{textAlign:'left',padding:'6px 8px',fontSize:'0.73rem',color:'var(--text-muted)'}}>SOURCE</th>
+                          <th style={{textAlign:'left',padding:'6px 8px',fontSize:'0.73rem',color:'var(--text-muted)'}}>NAME</th>
+                          <th style={{textAlign:'right',padding:'6px 8px',fontSize:'0.73rem',color:'var(--text-muted)'}}>ACTIONS</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {backups.map(b => (
+                          <tr key={b.id} style={{borderBottom:'1px solid var(--border)'}}>
+                            <td style={{padding:'6px 8px',color:'var(--text-muted)',whiteSpace:'nowrap'}}>{b.created_at.slice(0,10)}</td>
+                            <td style={{padding:'6px 8px'}}>{b.betaflight_version ? <span className="badge" style={{fontSize:'0.73rem'}}>BF {b.betaflight_version}</span> : '—'}</td>
+                            <td style={{padding:'6px 8px'}}>
+                              <span className="badge" style={{fontSize:'0.72rem',background: b.cold_backup_source === 'manufacturer' ? 'rgba(79,195,138,0.15)' : b.cold_backup_source === 'community' ? 'rgba(96,160,240,0.15)' : 'rgba(122,133,153,0.15)', color: b.cold_backup_source === 'manufacturer' ? '#4fc38a' : b.cold_backup_source === 'community' ? '#60a0f0' : '#7a8599'}}>
+                                {b.cold_backup_source === 'manufacturer' ? '🏭 Factory' : b.cold_backup_source === 'community' ? '👥 Community' : '✋ Manual'}
+                              </span>
+                            </td>
+                            <td style={{padding:'6px 8px',fontSize:'0.82rem'}}>{b.name.replace('[Factory] ','').slice(0, 50)}</td>
+                            <td style={{padding:'6px 8px',textAlign:'right'}}>
+                              <div style={{display:'inline-flex',gap:'4px'}}>
+                                {b.cold_backup_url && <a href={b.cold_backup_url} target="_blank" rel="noreferrer" className="button ghost" style={{padding:'2px 6px',fontSize:'0.7rem',textDecoration:'none'}} title="Original source">🔗</a>}
+                                <button type="button" className="button ghost" style={{padding:'2px 6px',fontSize:'0.7rem'}} title="View raw"
+                                  onClick={() => { setSelectedSnapshotId(b.id); void openRawSnapshot(b.id, b.name); setDroneTab('snapshots'); }}>
+                                  👁
+                                </button>
+                                {otherSnaps.length > 0 && (
+                                  <button type="button" className="button ghost" style={{padding:'2px 6px',fontSize:'0.7rem',color:'var(--accent)'}} title="Compare to current"
+                                    onClick={() => {
+                                      // Pre-select left=factory, right=current snapshot, jump to compare tab
+                                      const cur = otherSnaps.find(s => s.is_current) || otherSnaps[0];
+                                      // Trigger compare via the existing compare form by setting state used by it
+                                      apiFetch<CompareResponse>('/api/snapshots/compare', { method:'POST', body: JSON.stringify({ left_snapshot_id: b.id, right_snapshot_id: cur.id }) })
+                                        .then(r => { setCompareResult(r); setDroneTab('compare'); setOk(`Compared factory ${b.name.slice(0,30)}… vs ${cur.name.slice(0,30)}`); })
+                                        .catch(err => setErr((err as Error).message));
+                                    }}>
+                                    ⚖
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {backups.length > 0 && (
+                    <p style={{fontSize:'0.75rem',color:'var(--text-muted)',marginTop:'8px',marginBottom:0}}>
+                      🔒 Cold backups are <strong>never auto-deleted</strong> — they serve as a permanent restore reference.
+                      Action ⚖ compares factory dump against your current snapshot in the Compare tab.
+                    </p>
+                  )}
+                </article>
+              </section>
+            );
+          })()}
 
           {/* ── COMPARE TAB ── */}
           {droneTab === 'compare' && (
