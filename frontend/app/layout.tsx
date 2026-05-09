@@ -1,58 +1,39 @@
+'use client';
+
 import './globals.css';
-import type { Metadata, Viewport } from 'next';
-import { ReactNode } from 'react';
-
-export const metadata: Metadata = {
-  title: 'FPV Drone Catalog',
-  description: 'Self-hosted FPV drone fleet manager — Betaflight backups, checklists, flight logs',
-  manifest: '/manifest.webmanifest',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'FPV Fleet',
-  },
-  icons: {
-    icon: '/icon-192.png',
-    apple: '/apple-touch-icon.png',
-  },
-};
-
-export const viewport: Viewport = {
-  themeColor: '#60a0f0',
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-};
+import { ReactNode, useEffect } from 'react';
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        navigator.serviceWorker.addEventListener('message', (e) => {
+          if (e.data?.type === 'SYNC_COMPLETE') {
+            (window as unknown as Record<string, (...a: unknown[]) => unknown>).__fpvSyncComplete?.(e.data.remaining);
+          }
+        });
+        void reg;
+      }).catch(() => {});
+    }
+  }, []);
+
   return (
     <html lang="en">
       <head>
-        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <meta name="theme-color" content="#60a0f0" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="FPV Fleet" />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <title>FPV Drone Catalog</title>
+        <meta name="description" content="Self-hosted FPV drone fleet manager — Betaflight backups, checklists, flight logs" />
       </head>
-      <body>
-        {children}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then((reg) => {
-      // Listen for sync-complete messages from SW
-      navigator.serviceWorker.addEventListener('message', (e) => {
-        if (e.data?.type === 'SYNC_COMPLETE') {
-          window.__fpvSyncComplete?.(e.data.remaining);
-        }
-      });
-    }).catch(() => {});
-  });
-}
-`,
-          }}
-        />
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
