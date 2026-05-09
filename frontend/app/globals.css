@@ -275,9 +275,18 @@ details > .two-col {
   transition: border-color 120ms ease, background 120ms ease;
 }
 
-button.card:hover {
+.card.card-clickable:hover {
   background: rgba(255, 255, 255, 0.05);
   border-color: var(--border-hover);
+}
+
+.card.card-clickable {
+  cursor: pointer;
+}
+
+.card.card-clickable:focus-visible {
+  outline: 2px solid rgba(232, 116, 42, 0.7);
+  outline-offset: 2px;
 }
 
 .card.active {
