@@ -636,7 +636,18 @@ def get_snapshot_raw(snapshot_id: int, db: Session = Depends(get_db)) -> RawSnap
                 parsed_config=parsed,
             )
         )
-    return RawSnapshotResponse(snapshot_id=snapshot.id, files=files)
+    # Merge summaries from all CLI files (dump/diff_all) into one combined view
+    from .parser import extract_summary as _extract_summary
+    merged_kv: dict[str, str] = {}
+    for f in files:
+        if f.parsed_config:
+            for section_entries in f.parsed_config.values():
+                if isinstance(section_entries, list):
+                    for entry in section_entries:
+                        if isinstance(entry, dict) and "key" in entry:
+                            merged_kv[entry["key"]] = entry["value"]
+    combined_summary = _extract_summary(merged_kv) if merged_kv else None
+    return RawSnapshotResponse(snapshot_id=snapshot.id, files=files, summary=combined_summary)
 
 
 @app.post("/api/snapshots/compare", response_model=CompareResponse)

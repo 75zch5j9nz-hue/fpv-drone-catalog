@@ -520,6 +520,7 @@ class RawSnapshotFile(BaseModel):
 class RawSnapshotResponse(BaseModel):
     snapshot_id: int
     files: list[RawSnapshotFile]
+    summary: dict[str, Any] | None = None  # merged structured summary across all files
 
 
 

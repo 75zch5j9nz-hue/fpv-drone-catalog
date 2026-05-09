@@ -134,8 +134,21 @@ type Battery = {
   updated_at: string;
 };
 
+type PidAxis = { p: number | null; i: number | null; d: number | null; f: number | null };
+type SimplifiedPids = { mode?: string; master?: number | null; pi_gain?: number | null; d_gain?: number | null; i_gain?: number | null; ff_gain?: number | null };
+type RateAxis = { rc_rate: number | null; super_rate: number | null; expo: number | null };
+type SnapshotSummary = {
+  pids?: Record<string, PidAxis> & { _simplified?: SimplifiedPids | null };
+  rates?: { type: string; axes: Record<string, RateAxis>; tpa?: { rate: number; breakpoint: number } };
+  filters?: { mode?: string; gyro_lpf1_hz?: number; gyro_lpf2_hz?: number; dterm_lpf_hz?: number; rpm_filter?: number; dyn_notch?: { count: number; min_hz: number; max_hz: number }; gyro_multiplier?: number; dterm_multiplier?: number };
+  motor?: { protocol?: string; poles?: number; idle_pct?: number; idle_min_rpm?: number; throttle_boost?: number; output_limit_pct?: number };
+  vtx?: { band?: number; channel?: number; power_level?: number; freq_mhz?: number };
+  receiver?: { provider?: string; rssi_src?: string };
+};
+
 type RawSnapshotResponse = {
   snapshot_id: number;
+  summary?: SnapshotSummary | null;
   files: Array<{
     file_id: number;
     role: FileRole;
@@ -2100,47 +2113,84 @@ export default function HomePage() {
               </article>
 
               <article className="panel span-8">
-                <h3>Upload dump, diff all, or raw CLI</h3>
-                <form className="stack" onSubmit={(event) => void handleUpload(event)}>
+                <h3>Upload / Import CLI dump</h3>
+                <form className="stack" onSubmit={(event) => void handleUpload(event)}
+                  onDragOver={e => { e.preventDefault(); (e.currentTarget as HTMLElement).style.outline = '2px dashed var(--accent)'; }}
+                  onDragLeave={e => { (e.currentTarget as HTMLElement).style.outline = ''; }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLElement).style.outline = '';
+                    const file = e.dataTransfer.files[0];
+                    if (!file) return;
+                    // Auto-fill file input via DataTransfer
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    const fi = (e.currentTarget as HTMLElement).querySelector<HTMLInputElement>('input[name="file"]');
+                    if (fi) fi.files = dt.files;
+                    // Auto-detect export type from filename
+                    const sel = (e.currentTarget as HTMLElement).querySelector<HTMLSelectElement>('select[name="exportType"]');
+                    if (sel) {
+                      const n = file.name.toLowerCase();
+                      if (n.includes('diff')) sel.value = 'diff_all';
+                      else if (n.includes('dump')) sel.value = 'dump';
+                      else if (n.includes('version')) sel.value = 'version';
+                      else if (n.includes('status')) sel.value = 'status';
+                      else if (n.endsWith('.bbl') || n.endsWith('.bfl')) sel.value = 'blackbox';
+                    }
+                    // Auto-fill snapshot name from date in filename
+                    const nameIn = (e.currentTarget as HTMLElement).querySelector<HTMLInputElement>('input[name="snapshotName"]');
+                    if (nameIn && !nameIn.value) {
+                      const today = new Date().toISOString().slice(0,10);
+                      nameIn.value = `${today} imported`;
+                    }
+                  }}
+                  style={{borderRadius:'8px',transition:'outline 0.1s'}}
+                >
+                  <div style={{border:'2px dashed var(--border)',borderRadius:'8px',padding:'16px',textAlign:'center',color:'var(--text-muted)',fontSize:'0.85rem',marginBottom:'4px',cursor:'pointer'}}
+                    onClick={() => document.querySelector<HTMLInputElement>('input[name="file"]')?.click()}>
+                    <div style={{fontSize:'1.5rem',marginBottom:'4px'}}>📂</div>
+                    <div><strong>Drop .txt / .bbl file here</strong> or click to browse</div>
+                    <div style={{fontSize:'0.75rem',marginTop:'2px'}}>BF dump, diff all, version, status — type auto-detected from filename</div>
+                  </div>
                   <div className="two-col">
                     <label className="field">
                       <span>Target snapshot</span>
                       <select name="snapshotId" defaultValue="">
-                        <option value="">Create or use without snapshot</option>
+                        <option value="">— Create new snapshot —</option>
                         {selectedDrone.snapshots.map((snapshot) => (
                           <option key={snapshot.id} value={snapshot.id}>{snapshot.name}</option>
                         ))}
                       </select>
                     </label>
                     <label className="field">
-                      <span>Or create snapshot on upload</span>
-                      <input name="snapshotName" placeholder="2026-05-08 post-repair" />
+                      <span>New snapshot name</span>
+                      <input name="snapshotName" placeholder={`${new Date().toISOString().slice(0,10)} imported`} />
                     </label>
                   </div>
                   <label className="field">
-                    <span>Paste raw CLI text (paste-first: just paste and upload)</span>
-                    <textarea name="rawText" placeholder="Paste dump / diff all output here. No file needed — just paste and click Upload." />
+                    <span>Or paste raw CLI text</span>
+                    <textarea name="rawText" rows={3} placeholder="Paste output of: diff all  (BF version auto-detected from header)" />
                   </label>
                   <div className="two-col">
                     <label className="field">
                       <span>Export type</span>
                       <select name="exportType" defaultValue="dump">
                         <option value="dump">dump</option>
-                        <option value="diff_all">diff_all</option>
+                        <option value="diff_all">diff all</option>
                         <option value="status">status</option>
                         <option value="version">version</option>
-                        <option value="photo">photo</option>
-                        <option value="blackbox">blackbox</option>
+                        <option value="photo">photo / image</option>
+                        <option value="blackbox">blackbox (.bbl/.bfl)</option>
                         <option value="misc">misc</option>
                       </select>
                     </label>
                     <label className="field">
-                      <span>Or upload a file</span>
-                      <input name="file" type="file" />
+                      <span>File</span>
+                      <input name="file" type="file" accept=".txt,.log,.bbl,.bfl,.csv" />
                     </label>
                   </div>
                   <div className="actions">
-                    <button className="button" type="submit">Upload</button>
+                    <button className="button" type="submit">Upload & Parse</button>
                   </div>
                 </form>
               </article>
@@ -2223,7 +2273,115 @@ export default function HomePage() {
 
               <article className="panel span-7">
                 <h3>Raw snapshot viewer</h3>
-                {selectedSnapshot ? <p>Active snapshot: <strong>{selectedSnapshot.name}</strong></p> : null}
+                {selectedSnapshot ? <p style={{marginBottom:'8px'}}>Active snapshot: <strong>{selectedSnapshot.name}</strong></p> : null}
+
+                {/* ── Structured summary: PID table + rates + filters ── */}
+                {rawSnapshot?.summary && (() => {
+                  const s = rawSnapshot.summary!;
+                  const AXES = ['roll','pitch','yaw'] as const;
+                  const axisColor = (a: string) => a === 'roll' ? '#60a0f0' : a === 'pitch' ? '#4fc38a' : '#f0a830';
+                  return (
+                    <div style={{marginBottom:'12px',display:'flex',flexDirection:'column',gap:'8px'}}>
+
+                      {/* PID Table */}
+                      {s.pids && Object.keys(s.pids).filter(k => !k.startsWith('_')).length > 0 && (
+                        <div style={{border:'1px solid var(--border)',borderRadius:'8px',overflow:'hidden'}}>
+                          <div style={{padding:'6px 10px',background:'var(--surface2)',fontSize:'0.72rem',fontWeight:700,color:'var(--text-muted)',letterSpacing:'0.05em',display:'flex',justifyContent:'space-between'}}>
+                            <span>PID TUNING</span>
+                            {s.pids._simplified && <span style={{color:'var(--accent)'}}>Simplified mode: ×{s.pids._simplified.master ?? '?'}</span>}
+                          </div>
+                          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.82rem'}}>
+                            <thead>
+                              <tr style={{background:'rgba(255,255,255,0.03)'}}>
+                                <th style={{padding:'4px 8px',textAlign:'left',color:'var(--text-muted)',fontWeight:600,fontSize:'0.72rem'}}></th>
+                                {AXES.filter(a => s.pids![a]).map(a => (
+                                  <th key={a} style={{padding:'4px 8px',textAlign:'center',color:axisColor(a),fontWeight:700,fontSize:'0.75rem',textTransform:'uppercase'}}>{a}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(['p','i','d','f'] as const).map(term => (
+                                <tr key={term} style={{borderTop:'1px solid var(--border)'}}>
+                                  <td style={{padding:'4px 8px',color:'var(--text-muted)',fontWeight:700,fontSize:'0.75rem',width:'32px'}}>{term.toUpperCase()}</td>
+                                  {AXES.filter(a => s.pids![a]).map(a => (
+                                    <td key={a} style={{padding:'4px 8px',textAlign:'center',fontWeight:600,color: s.pids![a]?.[term] != null ? 'var(--text)' : 'var(--text-muted)'}}>
+                                      {s.pids![a]?.[term] ?? '—'}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {/* Rates Table */}
+                      {s.rates?.axes && Object.keys(s.rates.axes).length > 0 && (
+                        <div style={{border:'1px solid var(--border)',borderRadius:'8px',overflow:'hidden'}}>
+                          <div style={{padding:'6px 10px',background:'var(--surface2)',fontSize:'0.72rem',fontWeight:700,color:'var(--text-muted)',letterSpacing:'0.05em',display:'flex',justifyContent:'space-between'}}>
+                            <span>RATES</span>
+                            <span style={{color:'var(--accent)',fontWeight:400}}>{s.rates.type}</span>
+                          </div>
+                          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.82rem'}}>
+                            <thead>
+                              <tr style={{background:'rgba(255,255,255,0.03)'}}>
+                                <th style={{padding:'4px 8px',textAlign:'left',color:'var(--text-muted)',fontWeight:600,fontSize:'0.72rem'}}></th>
+                                {AXES.filter(a => s.rates!.axes[a]).map(a => (
+                                  <th key={a} style={{padding:'4px 8px',textAlign:'center',color:axisColor(a),fontWeight:700,fontSize:'0.75rem',textTransform:'uppercase'}}>{a}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {([['RC Rate','rc_rate'],['Super Rate','super_rate'],['Expo','expo']] as const).map(([label, field]) => (
+                                <tr key={field} style={{borderTop:'1px solid var(--border)'}}>
+                                  <td style={{padding:'4px 8px',color:'var(--text-muted)',fontSize:'0.75rem',whiteSpace:'nowrap'}}>{label}</td>
+                                  {AXES.filter(a => s.rates!.axes[a]).map(a => (
+                                    <td key={a} style={{padding:'4px 8px',textAlign:'center',fontWeight:600}}>
+                                      {s.rates!.axes[a]?.[field] ?? '—'}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                              {s.rates.tpa && (
+                                <tr style={{borderTop:'1px solid var(--border)'}}>
+                                  <td style={{padding:'4px 8px',color:'var(--text-muted)',fontSize:'0.75rem'}}>TPA</td>
+                                  <td colSpan={3} style={{padding:'4px 8px',fontSize:'0.8rem'}}>
+                                    {s.rates.tpa.rate}% @ {s.rates.tpa.breakpoint} throttle
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {/* Filters + Motor chips */}
+                      {(s.filters || s.motor || s.vtx || s.receiver) && (
+                        <div style={{display:'flex',flexWrap:'wrap',gap:'5px'}}>
+                          {s.motor?.protocol && <span className="badge" style={{fontSize:'0.73rem'}}>⚙ {s.motor.protocol}</span>}
+                          {s.motor?.poles != null && <span className="badge" style={{fontSize:'0.73rem'}}>{s.motor.poles}P motor</span>}
+                          {s.motor?.idle_pct != null && <span className="badge" style={{fontSize:'0.73rem'}}>Idle: {s.motor.idle_pct}%</span>}
+                          {s.motor?.output_limit_pct != null && s.motor.output_limit_pct !== 100 && <span className="badge" style={{fontSize:'0.73rem',color:'#f0a830'}}>Motor limit: {s.motor.output_limit_pct}%</span>}
+                          {s.filters?.mode === 'simplified' && (
+                            <span className="badge" style={{fontSize:'0.73rem',background:'rgba(96,160,240,0.12)',color:'#60a0f0'}}>
+                              Simplified filters{s.filters.gyro_multiplier != null ? ` ×${s.filters.gyro_multiplier}` : ''}
+                            </span>
+                          )}
+                          {s.filters?.mode === 'manual' && s.filters.gyro_lpf1_hz != null && (
+                            <span className="badge" style={{fontSize:'0.73rem'}}>Gyro LPF: {s.filters.gyro_lpf1_hz}Hz</span>
+                          )}
+                          {s.filters?.dterm_lpf_hz != null && <span className="badge" style={{fontSize:'0.73rem'}}>D-term LPF: {s.filters.dterm_lpf_hz}Hz</span>}
+                          {s.filters?.rpm_filter != null && <span className="badge" style={{fontSize:'0.73rem',background:'rgba(79,195,138,0.12)',color:'#4fc38a'}}>RPM filter</span>}
+                          {s.filters?.dyn_notch && <span className="badge" style={{fontSize:'0.73rem'}}>Notch ×{s.filters.dyn_notch.count}</span>}
+                          {s.vtx?.freq_mhz != null && <span className="badge" style={{fontSize:'0.73rem'}}>📡 {s.vtx.freq_mhz}MHz P{s.vtx.power_level ?? '?'}</span>}
+                          {s.vtx?.band != null && <span className="badge" style={{fontSize:'0.73rem'}}>📡 B{s.vtx.band}C{s.vtx.channel} P{s.vtx.power_level ?? '?'}</span>}
+                          {s.receiver?.provider && <span className="badge" style={{fontSize:'0.73rem'}}>RX: {s.receiver.provider}</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {rawSnapshot?.files.length ? rawSnapshot.files.map((file) => (
                   <div key={file.file_id} className="stack">
                     <div className="badge-row" style={{justifyContent:'space-between'}}>
