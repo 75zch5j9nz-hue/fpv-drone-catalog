@@ -245,12 +245,80 @@ class ReplaceComponentRequest(BaseModel):
 
 class FlightNoteCreate(BaseModel):
     title: str = Field(min_length=1, max_length=160)
-    note: str = Field(min_length=1)
+    note: str = Field(default="", min_length=0)
+    battery_id: int | None = None
+    duration_minutes: int | None = Field(default=None, ge=1, le=600)
+    battery_used_percent: int | None = Field(default=None, ge=1, le=100)
+    flight_date: str | None = None
+    location: str | None = Field(default=None, max_length=200)
+    wind_speed_kmh: int | None = Field(default=None, ge=0, le=200)
+    temperature_c: int | None = Field(default=None, ge=-30, le=60)
+    outcome: str = "ok"
+    motor_temps: str | None = None
+    battery_voltage_after: float | None = Field(default=None, ge=0, le=50)
+
+
+class FlightNoteUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    note: str | None = Field(default=None, min_length=0)
+    battery_id: int | None = None
+    duration_minutes: int | None = Field(default=None, ge=1, le=600)
+    battery_used_percent: int | None = Field(default=None, ge=1, le=100)
+    flight_date: str | None = None
+    location: str | None = Field(default=None, max_length=200)
+    wind_speed_kmh: int | None = Field(default=None, ge=0, le=200)
+    temperature_c: int | None = Field(default=None, ge=-30, le=60)
+    outcome: str | None = None
+    motor_temps: str | None = None
+    battery_voltage_after: float | None = Field(default=None, ge=0, le=50)
 
 
 class MaintenanceEventCreate(BaseModel):
     title: str = Field(min_length=1, max_length=160)
-    note: str = Field(min_length=1)
+    note: str = Field(default="", min_length=0)
+    event_type: str = "general"  # general | motor_swap | prop_change | frame_repair | fc_flash | crash
+    damage_items: str | None = None   # JSON string: list of damaged part labels
+    repair_cost_pln: int | None = Field(default=None, ge=0)
+    crash_severity: str | None = None  # minor | moderate | severe | total_loss
+    spare_parts_used: str | None = None  # JSON: [{"spare_stock_id": 1, "qty": 2}]
+
+
+class MaintenanceEventUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    note: str | None = Field(default=None, min_length=0)
+    event_type: str | None = None
+    damage_items: str | None = None
+    repair_cost_pln: int | None = Field(default=None, ge=0)
+    crash_severity: str | None = None
+    spare_parts_used: str | None = None
+
+
+class PreflightItemCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=160)
+    order_idx: int = 0
+    is_required: bool = True
+
+
+class PreflightItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    drone_id: int
+    label: str
+    order_idx: int
+    is_required: bool
+    created_at: datetime
+
+
+class ProductUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    manufacturer_id: int | None = None
+    category_id: int | None = None
+    description: str | None = None
+    specs: dict | None = None
+    tags: str | None = None
+    image_url: str | None = None
+    product_url: str | None = None
+    is_active: bool | None = None
 
 
 class SnapshotCreate(BaseModel):
@@ -273,6 +341,18 @@ class BatteryCreate(BaseModel):
     cycle_count: int = Field(default=0, ge=0)
     purchase_date: str | None = None
     notes: str | None = None
+    batt_status: str = "active"
+    is_puffed: bool = False
+    internal_resistance_mohm: int | None = Field(default=None, ge=0)
+    ir_c1_mohm: int | None = Field(default=None, ge=0)
+    ir_c2_mohm: int | None = Field(default=None, ge=0)
+    ir_c3_mohm: int | None = Field(default=None, ge=0)
+    ir_c4_mohm: int | None = Field(default=None, ge=0)
+    ir_c5_mohm: int | None = Field(default=None, ge=0)
+    ir_c6_mohm: int | None = Field(default=None, ge=0)
+    last_charged_at: datetime | None = None
+    voltage_after_last_flight: float | None = Field(default=None, ge=0, le=5000)
+    assigned_drone_id: int | None = None
 
 
 class BatteryUpdate(BaseModel):
@@ -283,6 +363,18 @@ class BatteryUpdate(BaseModel):
     cycle_count: int | None = Field(default=None, ge=0)
     purchase_date: str | None = None
     notes: str | None = None
+    batt_status: str | None = None
+    is_puffed: bool | None = None
+    internal_resistance_mohm: int | None = Field(default=None, ge=0)
+    ir_c1_mohm: int | None = Field(default=None, ge=0)
+    ir_c2_mohm: int | None = Field(default=None, ge=0)
+    ir_c3_mohm: int | None = Field(default=None, ge=0)
+    ir_c4_mohm: int | None = Field(default=None, ge=0)
+    ir_c5_mohm: int | None = Field(default=None, ge=0)
+    ir_c6_mohm: int | None = Field(default=None, ge=0)
+    last_charged_at: datetime | None = None
+    voltage_after_last_flight: float | None = Field(default=None, ge=0, le=5000)
+    assigned_drone_id: int | None = None
 
 
 class BatteryOut(BaseModel):
@@ -296,6 +388,18 @@ class BatteryOut(BaseModel):
     cycle_count: int
     purchase_date: str | None
     notes: str | None
+    batt_status: str
+    is_puffed: bool
+    internal_resistance_mohm: int | None
+    ir_c1_mohm: int | None
+    ir_c2_mohm: int | None
+    ir_c3_mohm: int | None
+    ir_c4_mohm: int | None
+    ir_c5_mohm: int | None
+    ir_c6_mohm: int | None
+    last_charged_at: datetime | None
+    voltage_after_last_flight: float | None
+    assigned_drone_id: int | None
     created_at: datetime
     updated_at: datetime
 
@@ -334,6 +438,16 @@ class FlightNoteOut(BaseModel):
     id: int
     title: str
     note: str
+    battery_id: int | None
+    duration_minutes: int | None
+    battery_used_percent: int | None
+    flight_date: str | None
+    location: str | None
+    wind_speed_kmh: int | None
+    temperature_c: int | None
+    outcome: str
+    motor_temps: str | None
+    battery_voltage_after: float | None
     created_at: datetime
 
 
@@ -343,6 +457,11 @@ class MaintenanceEventOut(BaseModel):
     id: int
     title: str
     note: str
+    event_type: str
+    damage_items: str | None
+    repair_cost_pln: int | None
+    crash_severity: str | None
+    spare_parts_used: str | None
     created_at: datetime
 
 
@@ -402,3 +521,39 @@ class RawSnapshotResponse(BaseModel):
     snapshot_id: int
     files: list[RawSnapshotFile]
 
+
+
+# ── Spare Stock ──────────────────────────────────────────────────────────────
+
+class SpareStockCreate(BaseModel):
+    part_name: str
+    category: str | None = None
+    quantity: int = 0
+    low_stock_threshold: int = 2
+    drone_id: int | None = None
+    product_id: int | None = None
+    notes: str | None = None
+
+
+class SpareStockUpdate(BaseModel):
+    part_name: str | None = None
+    category: str | None = None
+    quantity: int | None = None
+    low_stock_threshold: int | None = None
+    drone_id: int | None = None
+    product_id: int | None = None
+    notes: str | None = None
+
+
+class SpareStockOut(BaseModel):
+    id: int
+    part_name: str
+    category: str | None
+    quantity: int
+    low_stock_threshold: int
+    drone_id: int | None
+    product_id: int | None
+    notes: str | None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

@@ -106,8 +106,19 @@ export default function CataloguePage() {
     setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
   }
 
-  const roleCounts: Record<string, number> = {};
-  for (const p of filtered) roleCounts[p.component_role] = (roleCounts[p.component_role] ?? 0) + 1;
+  // Counts per role, filtered only by manufacturer (not by the role selector itself)
+  // so the role dropdown always shows accurate counts for the active manufacturer.
+  const filteredByMfrSearch = products.filter(p => {
+    if (filterMfr && p.manufacturer?.slug !== filterMfr) return false;
+    if (filterSearch) {
+      const q = filterSearch.toLowerCase();
+      if (!p.name.toLowerCase().includes(q) && !(p.manufacturer?.name.toLowerCase().includes(q))) return false;
+    }
+    return true;
+  });
+  const roleCountsForDropdown: Record<string, number> = {};
+  for (const p of filteredByMfrSearch) roleCountsForDropdown[p.component_role] = (roleCountsForDropdown[p.component_role] ?? 0) + 1;
+  const availableRoles = ROLE_ORDER.filter(r => (roleCountsForDropdown[r] ?? 0) > 0);
 
   return (
     <main className="page-shell">
@@ -137,8 +148,8 @@ export default function CataloguePage() {
           </select>
           <select value={filterRole} onChange={e => { setFilterRole(e.target.value); setSelected(null); }}>
             <option value="">All Roles</option>
-            {allRoles.map(r => (
-              <option key={r} value={r}>{ROLE_LABELS[r] ?? r} ({roleCounts[r] ?? products.filter(p=>p.component_role===r).length})</option>
+            {availableRoles.map(r => (
+              <option key={r} value={r}>{ROLE_LABELS[r] ?? r} ({roleCountsForDropdown[r] ?? 0})</option>
             ))}
           </select>
           <input
@@ -221,7 +232,7 @@ export default function CataloguePage() {
                   )}
 
                   <dl className="cat-spec-table">
-                    <div className="cat-spec-row"><dt>Role</dt><dd>{ROLE_LABELS[selected.component_role] ?? selected.component_role}</dd></div>
+                    {!selected.category && <div className="cat-spec-row"><dt>Role</dt><dd>{ROLE_LABELS[selected.component_role] ?? selected.component_role}</dd></div>}
                     {selected.category && <div className="cat-spec-row"><dt>Category</dt><dd>{selected.category.name}</dd></div>}
                     {selected.manufacturer && (
                       <div className="cat-spec-row">

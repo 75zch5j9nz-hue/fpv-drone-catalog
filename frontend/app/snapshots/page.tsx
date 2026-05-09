@@ -43,7 +43,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 function formatDate(v: string) {
-  return new Date(v).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return new Date(v).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export default function SnapshotsPage() {

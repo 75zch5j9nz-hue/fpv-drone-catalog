@@ -173,6 +173,21 @@ class Battery(Base):
     cycle_count: Mapped[int] = mapped_column(Integer, default=0)
     purchase_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Health tracking
+    batt_status: Mapped[str] = mapped_column(String(16), default="active")  # active|watchlist|retired|damaged
+    is_puffed: Mapped[bool] = mapped_column(Boolean, default=False)
+    internal_resistance_mohm: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Per-cell IR (mΩ) — up to 6S
+    ir_c1_mohm: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ir_c2_mohm: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ir_c3_mohm: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ir_c4_mohm: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ir_c5_mohm: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ir_c6_mohm: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Usage tracking
+    last_charged_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    voltage_after_last_flight: Mapped[float | None] = mapped_column(Integer, nullable=True)  # stored as mV integer
+    assigned_drone_id: Mapped[int | None] = mapped_column(ForeignKey("drones.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -221,9 +236,22 @@ class FlightNote(Base):
     drone_id: Mapped[int] = mapped_column(ForeignKey("drones.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(160))
     note: Mapped[str] = mapped_column(Text)
+    # Battery linkage + session metadata
+    battery_id: Mapped[int | None] = mapped_column(ForeignKey("batteries.id", ondelete="SET NULL"), nullable=True, index=True)
+    duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    battery_used_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Extended flight log fields
+    flight_date: Mapped[str | None] = mapped_column(String(20), nullable=True)   # YYYY-MM-DD
+    location: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    wind_speed_kmh: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    temperature_c: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    outcome: Mapped[str] = mapped_column(String(32), default="ok")  # ok|crash|emergency_landing|aborted
+    motor_temps: Mapped[str | None] = mapped_column(String(64), nullable=True)  # "ok,warm,ok,ok" for M1-M4
+    battery_voltage_after: Mapped[float | None] = mapped_column(nullable=True)  # volts
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     drone: Mapped[Drone] = relationship(back_populates="flight_notes")
+    battery: Mapped["Battery | None"] = relationship()
 
 
 class MaintenanceEvent(Base):
@@ -233,9 +261,28 @@ class MaintenanceEvent(Base):
     drone_id: Mapped[int] = mapped_column(ForeignKey("drones.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(160))
     note: Mapped[str] = mapped_column(Text)
+    # Event classification + crash report fields
+    event_type: Mapped[str] = mapped_column(String(32), default="general")
+    damage_items: Mapped[str | None] = mapped_column(Text, nullable=True)   # JSON list of damaged parts
+    repair_cost_pln: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    crash_severity: Mapped[str | None] = mapped_column(String(20), nullable=True)  # minor|moderate|severe|total_loss
+    spare_parts_used: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: [{"spare_stock_id":1,"qty":2}]
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     drone: Mapped[Drone] = relationship(back_populates="maintenance_events")
+
+
+class PreflightChecklistItem(Base):
+    __tablename__ = "preflight_checklist_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    drone_id: Mapped[int] = mapped_column(ForeignKey("drones.id", ondelete="CASCADE"), index=True)
+    label: Mapped[str] = mapped_column(String(160))
+    order_idx: Mapped[int] = mapped_column(Integer, default=0)
+    is_required: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    drone: Mapped[Drone] = relationship()
 
 
 class BuildVersion(Base):
@@ -273,3 +320,18 @@ class InstalledComponent(Base):
     build_version: Mapped["BuildVersion"] = relationship(back_populates="installed_components")
     product: Mapped["Product | None"] = relationship(back_populates="installed_components")
     product_variant: Mapped["ProductVariant | None"] = relationship(back_populates="installed_components")
+
+
+class SpareStock(Base):
+    """Spare parts inventory."""
+    __tablename__ = "spare_stock"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    part_name: Mapped[str] = mapped_column(String(200))
+    category: Mapped[str | None] = mapped_column(String(60), nullable=True)   # props, motors, fc, esc, frame, other
+    quantity: Mapped[int] = mapped_column(Integer, default=0)
+    low_stock_threshold: Mapped[int] = mapped_column(Integer, default=2)
+    drone_id: Mapped[int | None] = mapped_column(ForeignKey("drones.id", ondelete="SET NULL"), nullable=True, index=True)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -1,4 +1,5 @@
 import difflib
+import io
 import re
 import shutil
 import urllib.request
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
 from .db import Base, engine, get_db
-from .models import Battery, BuildVersion, Drone, FileRole, FlightNote, InstalledComponent, MaintenanceEvent, Manufacturer, Product, ProductCategory, ProductVariant, Snapshot, StoredFile
+from .models import Battery, BuildVersion, Drone, FileRole, FlightNote, InstalledComponent, MaintenanceEvent, Manufacturer, PreflightChecklistItem, Product, ProductCategory, ProductVariant, Snapshot, SpareStock, StoredFile
 from .parser import parse_betaflight_config
 
 _BF_VERSION_RE = re.compile(r"Betaflight\s*/\s*(?:INAV\s*/\s*)?[^/]+\s+([0-9]+\.[0-9]+\.[0-9]+)", re.IGNORECASE)
@@ -30,6 +31,11 @@ from .schemas import (
     DroneUpdate,
     FlightNoteCreate,
     FlightNoteOut,
+    FlightNoteUpdate,
+    MaintenanceEventUpdate,
+    PreflightItemCreate,
+    PreflightItemOut,
+    ProductUpdate,
     InstalledComponentCreate,
     InstalledComponentOut,
     MaintenanceEventCreate,
@@ -49,6 +55,9 @@ from .schemas import (
     SnapshotCreate,
     SnapshotOut,
     SnapshotUpdate,
+    SpareStockCreate,
+    SpareStockOut,
+    SpareStockUpdate,
     StoredFileOut,
 )
 from .storage import (
@@ -63,7 +72,12 @@ from .storage import (
 )
 
 settings = get_settings()
-app = FastAPI(title="FPV Drone Catalog API")
+app = FastAPI(
+    title="FPV Drone Catalog API",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -90,9 +104,68 @@ def _run_migrations() -> None:
         ("category", "VARCHAR(80)"),
         ("current_build_version_id", "INTEGER"),
     ]
+    new_flight_note_columns = [
+        ("battery_id", "INTEGER REFERENCES batteries(id) ON DELETE SET NULL"),
+        ("duration_minutes", "INTEGER"),
+        ("battery_used_percent", "INTEGER"),
+    ]
+    new_maintenance_columns = [
+        ("event_type", "VARCHAR(32) DEFAULT 'general'"),
+        ("damage_items", "TEXT"),
+        ("repair_cost_pln", "INTEGER"),
+    ]
+    new_battery_columns = [
+        ("batt_status", "VARCHAR(16) DEFAULT 'active'"),
+        ("is_puffed", "BOOLEAN DEFAULT FALSE"),
+        ("internal_resistance_mohm", "INTEGER"),
+        ("ir_c1_mohm", "INTEGER"),
+        ("ir_c2_mohm", "INTEGER"),
+        ("ir_c3_mohm", "INTEGER"),
+        ("ir_c4_mohm", "INTEGER"),
+        ("ir_c5_mohm", "INTEGER"),
+        ("ir_c6_mohm", "INTEGER"),
+        ("last_charged_at", "TIMESTAMP"),
+        ("voltage_after_last_flight", "REAL"),
+        ("assigned_drone_id", "INTEGER REFERENCES drones(id) ON DELETE SET NULL"),
+    ]
+    new_flight_note_columns_v2 = [
+        ("flight_date", "VARCHAR(20)"),
+        ("location", "VARCHAR(200)"),
+        ("wind_speed_kmh", "INTEGER"),
+        ("temperature_c", "INTEGER"),
+        ("outcome", "VARCHAR(32) DEFAULT 'ok'"),
+        ("motor_temps", "VARCHAR(64)"),
+        ("battery_voltage_after", "REAL"),
+    ]
+    new_maintenance_columns_v2 = [
+        ("crash_severity", "VARCHAR(20)"),
+        ("spare_parts_used", "TEXT"),
+    ]
     with engine.connect() as conn:
         for col, typedef in new_drone_columns:
             conn.execute(text(f"ALTER TABLE drones ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+        for col, typedef in new_flight_note_columns:
+            conn.execute(text(f"ALTER TABLE flight_notes ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+        for col, typedef in new_flight_note_columns_v2:
+            conn.execute(text(f"ALTER TABLE flight_notes ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+        for col, typedef in new_maintenance_columns:
+            conn.execute(text(f"ALTER TABLE maintenance_events ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+        for col, typedef in new_maintenance_columns_v2:
+            conn.execute(text(f"ALTER TABLE maintenance_events ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+        for col, typedef in new_battery_columns:
+            conn.execute(text(f"ALTER TABLE batteries ADD COLUMN IF NOT EXISTS {col} {typedef}"))
+        # For each drone that has snapshots but none marked current, mark the newest one
+        conn.execute(text("""
+            UPDATE snapshots SET is_current = TRUE
+            WHERE id IN (
+                SELECT DISTINCT ON (drone_id) id
+                FROM snapshots
+                WHERE drone_id NOT IN (
+                    SELECT DISTINCT drone_id FROM snapshots WHERE is_current = TRUE
+                )
+                ORDER BY drone_id, created_at DESC
+            )
+        """))
         conn.commit()
 
 
@@ -192,6 +265,45 @@ def health(db: Session = Depends(get_db)) -> dict[str, str]:
         "status": "ok",
         "database": "connected",
         "uploadDir": "writable" if writable else "missing",
+    }
+
+
+_PROXY_ALLOWED_HOST = "iflight.oss-cn-hongkong.aliyuncs.com"
+
+
+@app.get("/api/stats")
+def get_stats(db: Session = Depends(get_db)) -> dict:
+    from sqlalchemy import func
+    total_drones = db.execute(select(func.count()).select_from(Drone)).scalar_one()
+    flyable = db.execute(select(func.count()).select_from(Drone).where(Drone.status == "flyable")).scalar_one()
+    total_snapshots = db.execute(select(func.count()).select_from(Snapshot)).scalar_one()
+    total_batteries = db.execute(select(func.count()).select_from(Battery)).scalar_one()
+    total_products = db.execute(select(func.count()).select_from(Product)).scalar_one()
+    total_flights = db.execute(select(func.count()).select_from(FlightNote)).scalar_one()
+    total_maintenance = db.execute(select(func.count()).select_from(MaintenanceEvent)).scalar_one()
+    # Video system breakdown
+    video_rows = db.execute(
+        select(Drone.video_system, func.count().label("cnt"))
+        .where(Drone.video_system.isnot(None))
+        .group_by(Drone.video_system)
+        .order_by(func.count().desc())
+    ).all()
+    # Category breakdown
+    cat_rows = db.execute(
+        select(Drone.category, func.count().label("cnt"))
+        .where(Drone.category.isnot(None))
+        .group_by(Drone.category)
+        .order_by(func.count().desc())
+    ).all()
+    return {
+        "drones": {"total": total_drones, "flyable": flyable, "grounded": total_drones - flyable},
+        "snapshots": total_snapshots,
+        "batteries": total_batteries,
+        "products": total_products,
+        "flights": total_flights,
+        "maintenance": total_maintenance,
+        "by_video": {row.video_system: row.cnt for row in video_rows},
+        "by_category": {row.category: row.cnt for row in cat_rows},
     }
 
 
@@ -337,12 +449,17 @@ def list_snapshots(drone_id: int, db: Session = Depends(get_db)) -> list[Snapsho
 def create_snapshot(drone_id: int, payload: SnapshotCreate, db: Session = Depends(get_db)) -> Snapshot:
     drone = get_drone_or_404(db, drone_id)
     base_slug = safe_slug(payload.name, f"snapshot-{drone.id}")
+    existing_count = db.execute(
+        select(Snapshot).where(Snapshot.drone_id == drone.id)
+    ).scalars().all()
+    is_first = len(existing_count) == 0
     snapshot = Snapshot(
         drone_id=drone.id,
         name=payload.name,
         slug=next_unique_slug(db, Snapshot, base_slug, scope_column=Snapshot.drone_id, scope_value=drone.id),
         betaflight_version=payload.betaflight_version,
         notes=payload.notes,
+        is_current=is_first,
     )
     db.add(snapshot)
     db.commit()
@@ -545,8 +662,65 @@ def compare_snapshots(payload: CompareRequest, db: Session = Depends(get_db)) ->
 @app.post("/api/drones/{drone_id}/flights", response_model=FlightNoteOut, status_code=201)
 def create_flight_note(drone_id: int, payload: FlightNoteCreate, db: Session = Depends(get_db)) -> FlightNote:
     drone = get_drone_or_404(db, drone_id)
-    note = FlightNote(drone_id=drone.id, title=payload.title, note=payload.note)
+    note = FlightNote(
+        drone_id=drone.id,
+        title=payload.title,
+        note=payload.note,
+        battery_id=payload.battery_id,
+        duration_minutes=payload.duration_minutes,
+        battery_used_percent=payload.battery_used_percent,
+        flight_date=payload.flight_date,
+        location=payload.location,
+        wind_speed_kmh=payload.wind_speed_kmh,
+        temperature_c=payload.temperature_c,
+        outcome=payload.outcome,
+        motor_temps=payload.motor_temps,
+        battery_voltage_after=payload.battery_voltage_after,
+    )
     db.add(note)
+    # Increment battery cycle count + record last use if battery linked
+    if payload.battery_id:
+        battery = db.execute(select(Battery).where(Battery.id == payload.battery_id)).scalar_one_or_none()
+        if battery:
+            battery.cycle_count = battery.cycle_count + 1
+            battery.last_charged_at = datetime.utcnow()
+    # Auto-ground drone on crash outcome
+    if payload.outcome == "crash" and drone.status == "flyable":
+        drone.status = "grounded_crash"
+    db.commit()
+    db.refresh(note)
+    return note
+
+
+@app.patch("/api/drones/{drone_id}/flights/{note_id}", response_model=FlightNoteOut)
+def update_flight_note(drone_id: int, note_id: int, payload: FlightNoteUpdate, db: Session = Depends(get_db)) -> FlightNote:
+    note = db.execute(select(FlightNote).where(FlightNote.id == note_id, FlightNote.drone_id == drone_id)).scalar_one_or_none()
+    if not note:
+        raise HTTPException(status_code=404, detail="Flight note not found")
+    if payload.title is not None:
+        note.title = payload.title
+    if payload.note is not None:
+        note.note = payload.note
+    if payload.battery_id is not None:
+        note.battery_id = payload.battery_id
+    if payload.duration_minutes is not None:
+        note.duration_minutes = payload.duration_minutes
+    if payload.battery_used_percent is not None:
+        note.battery_used_percent = payload.battery_used_percent
+    if payload.flight_date is not None:
+        note.flight_date = payload.flight_date
+    if payload.location is not None:
+        note.location = payload.location
+    if payload.wind_speed_kmh is not None:
+        note.wind_speed_kmh = payload.wind_speed_kmh
+    if payload.temperature_c is not None:
+        note.temperature_c = payload.temperature_c
+    if payload.outcome is not None:
+        note.outcome = payload.outcome
+    if payload.motor_temps is not None:
+        note.motor_temps = payload.motor_temps
+    if payload.battery_voltage_after is not None:
+        note.battery_voltage_after = payload.battery_voltage_after
     db.commit()
     db.refresh(note)
     return note
@@ -570,8 +744,55 @@ def list_flight_notes(drone_id: int, db: Session = Depends(get_db)) -> list[Flig
 @app.post("/api/drones/{drone_id}/maintenance", response_model=MaintenanceEventOut, status_code=201)
 def create_maintenance_event(drone_id: int, payload: MaintenanceEventCreate, db: Session = Depends(get_db)) -> MaintenanceEvent:
     drone = get_drone_or_404(db, drone_id)
-    event = MaintenanceEvent(drone_id=drone.id, title=payload.title, note=payload.note)
+    event = MaintenanceEvent(
+        drone_id=drone.id,
+        title=payload.title,
+        note=payload.note,
+        event_type=payload.event_type,
+        damage_items=payload.damage_items,
+        repair_cost_pln=payload.repair_cost_pln,
+        crash_severity=payload.crash_severity,
+        spare_parts_used=payload.spare_parts_used,
+    )
     db.add(event)
+    # Auto-ground drone on crash event
+    if payload.event_type == "crash" and drone.status == "flyable":
+        drone.status = "grounded_crash"
+    # Auto-deduct spare parts from inventory
+    if payload.spare_parts_used:
+        import json as _json
+        try:
+            parts = _json.loads(payload.spare_parts_used)
+            for entry in parts:
+                spare = db.execute(select(SpareStock).where(SpareStock.id == entry.get("spare_stock_id"))).scalar_one_or_none()
+                if spare:
+                    spare.quantity = max(0, spare.quantity - int(entry.get("qty", 1)))
+        except Exception:
+            pass
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+@app.patch("/api/drones/{drone_id}/maintenance/{event_id}", response_model=MaintenanceEventOut)
+def update_maintenance_event(drone_id: int, event_id: int, payload: MaintenanceEventUpdate, db: Session = Depends(get_db)) -> MaintenanceEvent:
+    event = db.execute(select(MaintenanceEvent).where(MaintenanceEvent.id == event_id, MaintenanceEvent.drone_id == drone_id)).scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Maintenance event not found")
+    if payload.title is not None:
+        event.title = payload.title
+    if payload.note is not None:
+        event.note = payload.note
+    if payload.event_type is not None:
+        event.event_type = payload.event_type
+    if payload.damage_items is not None:
+        event.damage_items = payload.damage_items
+    if payload.repair_cost_pln is not None:
+        event.repair_cost_pln = payload.repair_cost_pln
+    if payload.crash_severity is not None:
+        event.crash_severity = payload.crash_severity
+    if payload.spare_parts_used is not None:
+        event.spare_parts_used = payload.spare_parts_used
     db.commit()
     db.refresh(event)
     return event
@@ -594,6 +815,46 @@ def list_maintenance_events(drone_id: int, db: Session = Depends(get_db)) -> lis
             select(MaintenanceEvent).where(MaintenanceEvent.drone_id == drone_id).order_by(MaintenanceEvent.created_at.desc())
         ).scalars()
     )
+
+
+# ── Preflight checklist endpoints ─────────────────────────────────────────────
+
+@app.get("/api/drones/{drone_id}/checklist", response_model=list[PreflightItemOut])
+def list_checklist(drone_id: int, db: Session = Depends(get_db)) -> list[PreflightChecklistItem]:
+    get_drone_or_404(db, drone_id)
+    return list(
+        db.execute(
+            select(PreflightChecklistItem)
+            .where(PreflightChecklistItem.drone_id == drone_id)
+            .order_by(PreflightChecklistItem.order_idx, PreflightChecklistItem.id)
+        ).scalars()
+    )
+
+
+@app.post("/api/drones/{drone_id}/checklist", response_model=PreflightItemOut, status_code=201)
+def create_checklist_item(drone_id: int, payload: PreflightItemCreate, db: Session = Depends(get_db)) -> PreflightChecklistItem:
+    get_drone_or_404(db, drone_id)
+    item = PreflightChecklistItem(
+        drone_id=drone_id,
+        label=payload.label,
+        order_idx=payload.order_idx,
+        is_required=payload.is_required,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.delete("/api/drones/{drone_id}/checklist/{item_id}", status_code=204)
+def delete_checklist_item(drone_id: int, item_id: int, db: Session = Depends(get_db)) -> None:
+    item = db.execute(
+        select(PreflightChecklistItem).where(PreflightChecklistItem.id == item_id, PreflightChecklistItem.drone_id == drone_id)
+    ).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Checklist item not found")
+    db.delete(item)
+    db.commit()
 
 
 # ── Battery fleet endpoints ────────────────────────────────────────────────────
@@ -637,6 +898,14 @@ def list_batteries(db: Session = Depends(get_db)) -> list[Battery]:
     return list(db.execute(select(Battery).order_by(Battery.created_at.desc())).scalars())
 
 
+@app.get("/api/batteries/{battery_id}", response_model=BatteryOut)
+def get_battery(battery_id: int, db: Session = Depends(get_db)) -> Battery:
+    battery = db.execute(select(Battery).where(Battery.id == battery_id)).scalar_one_or_none()
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
+    return battery
+
+
 @app.post("/api/batteries", response_model=BatteryOut, status_code=201)
 def create_battery(payload: BatteryCreate, db: Session = Depends(get_db)) -> Battery:
     existing = db.execute(select(Battery).where(Battery.label == payload.label)).scalar_one_or_none()
@@ -671,6 +940,69 @@ def delete_battery(battery_id: int, db: Session = Depends(get_db)) -> None:
     if not battery:
         raise HTTPException(status_code=404, detail="Battery not found")
     db.delete(battery)
+    db.commit()
+
+
+# ── QR Code labels ────────────────────────────────────────────────────────────
+
+@app.get("/api/qr/{entity_type}/{entity_id}")
+def generate_qr(entity_type: str, entity_id: int, size: int = 200) -> Response:
+    """Return a PNG QR code for a drone or battery deep-link URL."""
+    if entity_type not in ("drone", "battery"):
+        raise HTTPException(status_code=400, detail="entity_type must be 'drone' or 'battery'")
+    settings = get_settings()
+    base_url = settings.app_url
+    path = f"/drones?id={entity_id}" if entity_type == "drone" else f"/?section=batteries&bat={entity_id}"
+    url = f"{base_url}{path}"
+    try:
+        import qrcode  # type: ignore
+        import qrcode.image.pil  # type: ignore
+        qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=max(1, size // 25), border=2)
+        qr.add_data(url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return Response(content=buf.getvalue(), media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
+    except ImportError:
+        raise HTTPException(status_code=503, detail="qrcode library not installed")
+
+
+# ── Spare Parts Inventory ─────────────────────────────────────────────────────
+
+@app.get("/api/spare-stock", response_model=list[SpareStockOut])
+@app.get("/api/spare-parts", response_model=list[SpareStockOut], include_in_schema=False)
+def list_spare_stock(db: Session = Depends(get_db)) -> list[SpareStock]:
+    return list(db.execute(select(SpareStock).order_by(SpareStock.part_name)).scalars())
+
+
+@app.post("/api/spare-stock", response_model=SpareStockOut, status_code=201)
+def create_spare_stock(payload: SpareStockCreate, db: Session = Depends(get_db)) -> SpareStock:
+    item = SpareStock(**payload.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.patch("/api/spare-stock/{item_id}", response_model=SpareStockOut)
+def update_spare_stock(item_id: int, payload: SpareStockUpdate, db: Session = Depends(get_db)) -> SpareStock:
+    item = db.execute(select(SpareStock).where(SpareStock.id == item_id)).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Spare stock item not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(item, field, value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.delete("/api/spare-stock/{item_id}", status_code=204)
+def delete_spare_stock(item_id: int, db: Session = Depends(get_db)) -> None:
+    item = db.execute(select(SpareStock).where(SpareStock.id == item_id)).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Spare stock item not found")
+    db.delete(item)
     db.commit()
 
 
@@ -795,6 +1127,20 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db)) -> Pro
         db.add(variant)
     db.commit()
     return db.execute(_product_query().where(Product.id == product.id)).scalar_one()
+
+
+@app.patch("/api/products/{product_id}", response_model=ProductOut)
+def update_product(product_id: int, payload: ProductUpdate, db: Session = Depends(get_db)) -> Product:
+    product = db.execute(select(Product).where(Product.id == product_id)).scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        if field == 'specs' and isinstance(value, dict):
+            setattr(product, field, _json.dumps(value))
+        else:
+            setattr(product, field, value)
+    db.commit()
+    return db.execute(_product_query().where(Product.id == product_id)).scalar_one()
 
 
 @app.post("/api/products/{product_id}/variants", response_model=ProductVariantOut, status_code=201)
