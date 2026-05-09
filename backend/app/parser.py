@@ -301,7 +301,6 @@ def parse_betaflight_config(text: str) -> dict[str, Any]:
 
     Only sections that actually contain at least one setting are included.
     The ``other`` key collects settings that don't match any known prefix.
-    Includes a top-level ``_summary`` key with structured PID/rates/filter data.
     """
     buckets: dict[str, list[dict[str, str]]] = {
         "pids": [], "rates": [], "filters": [],
@@ -316,8 +315,4 @@ def parse_betaflight_config(text: str) -> dict[str, Any]:
         buckets[bucket].append({"key": key, "value": value})
         kv[key] = value
 
-    result = {section: entries for section, entries in buckets.items() if entries}
-    summary = extract_summary(kv)
-    if summary:
-        result["_summary"] = summary
-    return result
+    return {section: entries for section, entries in buckets.items() if entries}

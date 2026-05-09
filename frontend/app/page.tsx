@@ -1815,9 +1815,10 @@ export default function HomePage() {
               const readinessMeta = READINESS_META[readiness];
               return (
               <Fragment key={drone.id}>
-              <button
-                className={`card ${drone.id === selectedDroneId ? 'active' : ''}`}
-                type="button"
+              <div
+                className={`card card-clickable ${drone.id === selectedDroneId ? 'active' : ''}`}
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   setSelectedDroneId(drone.id);
                   const preferred = pickDefaultSnapshot(drone);
@@ -1827,6 +1828,20 @@ export default function HomePage() {
                   } else {
                     setRawSnapshot(null);
                     setOk(`Selected ${drone.name}. No snapshots yet.`);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedDroneId(drone.id);
+                    const preferred = pickDefaultSnapshot(drone);
+                    setSelectedSnapshotId(preferred?.id ?? null);
+                    if (preferred) {
+                      void openRawSnapshot(preferred.id, preferred.name);
+                    } else {
+                      setRawSnapshot(null);
+                      setOk(`Selected ${drone.name}. No snapshots yet.`);
+                    }
                   }
                 }}
               >
@@ -1933,7 +1948,7 @@ export default function HomePage() {
                     )}
                   </div>
                 </div>
-              </button>
+              </div>
               {editDroneId === drone.id && (
                 <div className="edit-panel">
                   <h4 style={{margin:'0 0 10px',fontSize:'0.95rem'}}>Edit &ldquo;{drone.name}&rdquo;</h4>
@@ -2399,12 +2414,14 @@ export default function HomePage() {
                         })}
                       >{lastCopiedFileId === file.file_id ? '✓ Copied' : 'Copy'}</button>
                     </div>
-                    {file.parsed_config && Object.keys(file.parsed_config).length > 0 && (
+                    {file.parsed_config && Object.keys(file.parsed_config).length > 0 && (() => {
+                      const parsedSections = Object.entries(file.parsed_config).filter(([, entries]) => Array.isArray(entries));
+                      return (
                       <details style={{marginBottom:'6px'}}>
                         <summary style={{cursor:'pointer',fontWeight:600,fontSize:'0.88rem',color:'var(--muted)'}}>
-                          Structured config ({Object.values(file.parsed_config).reduce((acc, s) => acc + s.length, 0)} settings)
+                          Structured config ({parsedSections.reduce((acc, [, entries]) => acc + entries.length, 0)} settings)
                         </summary>
-                        {Object.entries(file.parsed_config).map(([section, entries]) => (
+                        {parsedSections.map(([section, entries]) => (
                           <details key={section} style={{marginLeft:'14px',marginTop:'4px'}}>
                             <summary style={{cursor:'pointer',fontSize:'0.85rem',display:'flex',alignItems:'center',gap:'8px'}}>
                               <span style={{textTransform:'capitalize'}}>{section}</span>
@@ -2424,7 +2441,8 @@ export default function HomePage() {
                           </details>
                         ))}
                       </details>
-                    )}
+                      );
+                    })()}
                     <pre className="code-box">{file.content}</pre>
                   </div>
                 )) : <p>No raw files attached to the selected snapshot.</p>}
