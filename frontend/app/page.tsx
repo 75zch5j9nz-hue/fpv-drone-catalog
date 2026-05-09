@@ -146,6 +146,18 @@ type SnapshotSummary = {
   receiver?: { provider?: string; rssi_src?: string };
 };
 
+// #7 Flight stats
+type DroneFlightStats = { drone_id: number; total_flights: number; total_minutes: number; avg_minutes: number; last_flight_date: string | null; flights_last_30d: number };
+
+// #8 Maintenance alerts
+type MaintenanceAlert = { id: number; drone_id: number; title: string; trigger_type: string; trigger_value: number; current_count: number; is_active: boolean; last_reset_at: string | null; is_due: boolean; pct: number; created_at: string };
+
+// #11 Users
+type User = { id: number; username: string; display_name: string | null; role: string; is_active: boolean; created_at: string; last_login_at: string | null };
+
+// #15 ELRS profiles
+type ElrsProfile = { id: number; drone_id: number | null; name: string; device_type: string; firmware_version: string | null; binding_phrase: string | null; rf_freq: string | null; rf_mode: string | null; tx_power: string | null; notes: string | null; raw_config: string | null; is_current: boolean; created_at: string };
+
 type RawSnapshotResponse = {
   snapshot_id: number;
   summary?: SnapshotSummary | null;
@@ -473,7 +485,22 @@ export default function HomePage() {
   // Hardware history panel for a selected drone
   const [showHwHistory, setShowHwHistory] = useState<number | null>(null); // drone id
   const [hwHistory, setHwHistory] = useState<InstalledComponent[]>([]);
-  const [droneTab, setDroneTab] = useState<'snapshots' | 'flight-log' | 'maintenance' | 'compare' | 'checklist'>('snapshots');
+  const [droneTab, setDroneTab] = useState<'snapshots' | 'flight-log' | 'maintenance' | 'compare' | 'checklist' | 'photos' | 'elrs' | 'stats'>('snapshots');
+  // #7 Flight stats
+  const [droneStats, setDroneStats] = useState<Record<number, DroneFlightStats>>({});
+  // #8 Maintenance alerts
+  const [maintAlerts, setMaintAlerts] = useState<Record<number, MaintenanceAlert[]>>({});
+  const [dueAlerts, setDueAlerts] = useState<MaintenanceAlert[]>([]);
+  // #11 Users
+  const [users, setUsers] = useState<User[]>([]);
+  const [showUserPanel, setShowUserPanel] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(typeof window !== 'undefined' ? localStorage.getItem('fpv_token') : null);
+  // #15 ELRS
+  const [elrsProfiles, setElrsProfiles] = useState<ElrsProfile[]>([]);
+  // #16 BF Presets
+  const [presetResults, setPresetResults] = useState<{total:number; manufacturer:number; community:number; results:Array<{title:string; url:string; source_type:string; is_factory_dump:boolean; source?:string; firmware_version?: string[]; author?:string}>} | null>(null);
+  const [presetsLoading, setPresetsLoading] = useState(false);
   // Checklist state
   const [checklistItems, setChecklistItems] = useState<Record<number, PreflightItem[]>>({});
   const [checklistChecked, setChecklistChecked] = useState<Record<string, boolean>>({});
@@ -1192,7 +1219,59 @@ export default function HomePage() {
         <Link className={`subnav-link${isBatteriesPage ? ' active' : ''}`} href="/batteries">Batteries</Link>
         <Link className={`subnav-link${pathname === '/catalogue' ? ' active' : ''}`} href="/catalogue">Catalogue</Link>
         <Link className={`subnav-link${pathname === '/snapshots' ? ' active' : ''}`} href="/snapshots">Snapshots</Link>
+        <button className="subnav-link" type="button" onClick={() => {
+          setShowUserPanel(true);
+          apiFetch<User[]>('/api/users').then(setUsers).catch(() => {});
+        }} style={{background:'none',border:'none',cursor:'pointer'}}>⚙ Users</button>
       </nav>
+
+      {/* ── #11 User Management Modal ── */}
+      {showUserPanel && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}} onClick={() => setShowUserPanel(false)}>
+          <div className="panel" onClick={e => e.stopPropagation()} style={{width:'min(640px,95vw)',maxHeight:'80vh',overflow:'auto',padding:'20px'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}}>
+              <h3 style={{margin:0}}>User Management</h3>
+              <button className="button ghost" type="button" onClick={() => setShowUserPanel(false)}>✕ Close</button>
+            </div>
+            <div style={{marginBottom:'14px'}}>
+              {users.map(u => (
+                <div key={u.id} style={{display:'flex',gap:'8px',alignItems:'center',padding:'7px 10px',borderRadius:'6px',background:'var(--surface2)',marginBottom:'4px'}}>
+                  <span style={{flex:1,fontWeight:600}}>{u.username}</span>
+                  {u.display_name && <span style={{color:'var(--text-muted)',fontSize:'0.82rem'}}>{u.display_name}</span>}
+                  <span className="badge" style={{fontSize:'0.73rem',background: u.role==='admin' ? 'rgba(240,168,48,0.15)' : 'rgba(79,195,138,0.12)',color: u.role==='admin' ? '#f0a830' : '#4fc38a'}}>{u.role}</span>
+                  {!u.is_active && <span className="badge" style={{fontSize:'0.73rem',color:'#e04040'}}>disabled</span>}
+                  <button className="button ghost" type="button" style={{fontSize:'0.72rem',padding:'2px 7px',color:'#b72b0f'}}
+                    onClick={() => { if(!confirm(`Delete user "${u.username}"?`)) return; apiFetch(`/api/users/${u.id}`,{method:'DELETE'}).then(() => setUsers(prev => prev.filter(x=>x.id!==u.id))).catch(() => {}); }}>✕</button>
+                </div>
+              ))}
+            </div>
+            <form className="stack" style={{borderTop:'1px solid var(--border)',paddingTop:'12px'}} onSubmit={e => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              apiFetch<User>('/api/users', {method:'POST', body:JSON.stringify({
+                username: fd.get('username'), password: fd.get('password'),
+                display_name: fd.get('display_name') || null, role: fd.get('role'),
+              })}).then(u => { setUsers(prev => [...prev, u]); (e.target as HTMLFormElement).reset(); setOk(`User ${u.username} created.`); })
+                 .catch(err => setErr((err as Error).message));
+            }}>
+              <h4 style={{margin:'0 0 8px',fontSize:'0.88rem'}}>Add User</h4>
+              <div className="two-col">
+                <label className="field"><span>Username</span><input name="username" required placeholder="john" /></label>
+                <label className="field"><span>Display name</span><input name="display_name" placeholder="John Pilot" /></label>
+                <label className="field"><span>Password</span><input name="password" type="password" required minLength={6} /></label>
+                <label className="field"><span>Role</span>
+                  <select name="role">
+                    <option value="pilot">Pilot</option>
+                    <option value="mechanic">Mechanic</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </label>
+              </div>
+              <button className="button" type="submit">Create User</button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {isOverviewPage && (
         <div className="overview-landing">
@@ -2088,6 +2167,9 @@ export default function HomePage() {
                 ['flight-log', `Flight Log (${selectedDrone.flight_notes.length})`],
                 ['maintenance', `Maintenance (${selectedDrone.maintenance_events.length})`],
                 ['checklist', `Checklist (${(checklistItems[selectedDrone.id] ?? []).length})`],
+                ['photos', 'Photos'],
+                ['elrs', 'ELRS'],
+                ['stats', 'Stats'],
                 ['compare', 'Compare'],
               ] as const).map(([tab, label]) => (
                 <button
@@ -2097,6 +2179,15 @@ export default function HomePage() {
                   onClick={() => {
                     setDroneTab(tab);
                     if (tab === 'checklist') void loadChecklist(selectedDrone.id);
+                    if (tab === 'stats' && !droneStats[selectedDrone.id]) {
+                      apiFetch<DroneFlightStats>(`/api/drones/${selectedDrone.id}/stats`).then(s => setDroneStats(prev => ({...prev, [selectedDrone.id]: s}))).catch(() => {});
+                    }
+                    if (tab === 'maintenance' && !maintAlerts[selectedDrone.id]) {
+                      apiFetch<MaintenanceAlert[]>(`/api/drones/${selectedDrone.id}/maintenance-alerts`).then(a => setMaintAlerts(prev => ({...prev, [selectedDrone.id]: a}))).catch(() => {});
+                    }
+                    if (tab === 'elrs') {
+                      apiFetch<ElrsProfile[]>(`/api/elrs-profiles?drone_id=${selectedDrone.id}`).then(setElrsProfiles).catch(() => {});
+                    }
                   }}
                 >
                   {label}
@@ -2108,6 +2199,59 @@ export default function HomePage() {
           {/* ── SNAPSHOTS TAB ── */}
           {droneTab === 'snapshots' && (
             <section className="content-grid">
+              {/* #16 BF Presets cold backup panel */}
+              <article className="panel span-12" style={{paddingBottom:'10px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                  <h3 style={{margin:0}}>Factory & Community Presets</h3>
+                  <span style={{fontSize:'0.78rem',color:'var(--text-muted)'}}>Import official CLI dumps as cold backups</span>
+                  <button className="button ghost" type="button" style={{marginLeft:'auto',fontSize:'0.8rem'}}
+                    onClick={async () => {
+                      setPresetsLoading(true);
+                      try {
+                        const r = await apiFetch<typeof presetResults>(`/api/presets/search?drone_id=${selectedDrone.id}`);
+                        setPresetResults(r);
+                      } catch { setErr('Cannot reach presets source.'); }
+                      setPresetsLoading(false);
+                    }}>
+                    {presetsLoading ? 'Searching…' : '🔍 Find presets for this drone'}
+                  </button>
+                </div>
+                {presetResults && (
+                  <div style={{marginTop:'8px'}}>
+                    <div style={{fontSize:'0.78rem',color:'var(--text-muted)',marginBottom:'6px'}}>
+                      Found {presetResults.manufacturer} manufacturer + {presetResults.community} community presets
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+                      {presetResults.results.map((p, i) => (
+                        <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',padding:'6px 10px',borderRadius:'6px',background:'var(--surface2)',border:`1px solid ${p.is_factory_dump ? 'rgba(79,195,138,0.3)' : 'var(--border)'}`}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontWeight:600,fontSize:'0.83rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title}</div>
+                            <div style={{fontSize:'0.72rem',color:'var(--text-muted)'}}>
+                              {p.is_factory_dump ? '🏭 Factory dump' : '👥 Community'} · {p.source || 'betaflight-presets'}
+                              {p.author && ` · ${p.author}`}
+                              {p.firmware_version && ` · BF ${Array.isArray(p.firmware_version) ? p.firmware_version.join('/') : p.firmware_version}`}
+                            </div>
+                          </div>
+                          <button className="button ghost" type="button" style={{fontSize:'0.75rem',padding:'3px 9px',whiteSpace:'nowrap',color:'#4fc38a'}}
+                            onClick={async () => {
+                              setOk('Downloading preset…');
+                              try {
+                                const snap = await apiFetch<{id:number;name:string}>(`/api/drones/${selectedDrone.id}/presets/import`, {
+                                  method:'POST', body:JSON.stringify({url:p.url, title:p.title})
+                                });
+                                await loadDrones(selectedDrone.id);
+                                setOk(`Preset imported as snapshot: ${snap.name}`);
+                              } catch (err) { setErr((err as Error).message); }
+                            }}>
+                            ↓ Import as backup
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </article>
+
               <article className="panel span-4">
                 <h3>Create snapshot</h3>
                 <form className="stack" onSubmit={(event) => void handleCreateSnapshot(event)}>
@@ -2454,7 +2598,26 @@ export default function HomePage() {
           {droneTab === 'flight-log' && (
             <section className="content-grid">
               <article className="panel span-4">
-                <h3>Add flight note</h3>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
+                  <h3 style={{margin:0}}>Add flight note</h3>
+                  <label style={{fontSize:'0.75rem',color:'var(--accent)',cursor:'pointer',padding:'2px 8px',border:'1px solid var(--accent)',borderRadius:'4px'}}
+                    title="Import DJI OSD .srt or telemetry .csv — auto-creates flight log entry">
+                    📡 Import OSD
+                    <input type="file" accept=".srt,.csv" style={{display:'none'}} onChange={async e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const fd = new FormData();
+                      fd.append('file', file);
+                      setOk('Importing OSD telemetry…');
+                      try {
+                        const r = await apiFetch<{imported:number;skipped:number}>(`/api/drones/${selectedDrone.id}/import-osd`, {method:'POST',body:fd});
+                        await loadDrones(selectedDrone.id);
+                        setOk(`OSD import: ${r.imported} flight(s) created.`);
+                      } catch (err) { setErr((err as Error).message); }
+                      e.target.value = '';
+                    }} />
+                  </label>
+                </div>
                 <form className="stack" onSubmit={(event) => void handleCreateNote(event, 'flights')}>
                   <div className="two-col">
                     <label className="field">
@@ -2660,6 +2823,50 @@ export default function HomePage() {
                 </form>
               </article>
               <article className="panel span-8">
+                {/* #8 Maintenance alerts panel */}
+                {(() => {
+                  const alerts = maintAlerts[selectedDrone.id] ?? [];
+                  return (
+                    <div style={{marginBottom:'14px'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
+                        <h3 style={{margin:0}}>Service Reminders</h3>
+                        <button className="button ghost" type="button" style={{fontSize:'0.75rem',padding:'2px 8px'}}
+                          onClick={() => {
+                            const title = prompt('Reminder title (e.g. "Replace props")');
+                            if (!title) return;
+                            const type = prompt('Trigger type: flight_count | days | cycle_count', 'flight_count');
+                            if (!type) return;
+                            const val = parseInt(prompt('Trigger every N (flights/days/cycles)', '50') ?? '50', 10);
+                            apiFetch<MaintenanceAlert>(`/api/drones/${selectedDrone.id}/maintenance-alerts`, {method:'POST',body:JSON.stringify({title,trigger_type:type,trigger_value:val})})
+                              .then(a => setMaintAlerts(prev => ({...prev, [selectedDrone.id]: [...(prev[selectedDrone.id]??[]),a]})))
+                              .catch(() => {});
+                          }}>+ Add reminder</button>
+                      </div>
+                      {alerts.length === 0 && <p style={{color:'var(--text-muted)',fontSize:'0.82rem',margin:0}}>No reminders set. Add one to track prop cycles, bearing lubrication, etc.</p>}
+                      <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
+                        {alerts.map(a => (
+                          <div key={a.id} style={{padding:'8px 10px',borderRadius:'6px',border:`1px solid ${a.is_due ? 'rgba(224,64,64,0.4)' : 'var(--border)'}`,background:a.is_due ? 'rgba(224,64,64,0.06)' : 'var(--surface2)',display:'flex',alignItems:'center',gap:'10px'}}>
+                            <div style={{flex:1}}>
+                              <div style={{fontWeight:600,fontSize:'0.85rem',color:a.is_due ? '#e04040' : 'var(--text)'}}>{a.is_due ? '⚠ ' : ''}{a.title}</div>
+                              <div style={{fontSize:'0.73rem',color:'var(--text-muted)',marginTop:'2px'}}>
+                                Every {a.trigger_value} {a.trigger_type.replace('_',' ')} · {a.current_count}/{a.trigger_value}
+                              </div>
+                            </div>
+                            <div style={{width:'60px',height:'6px',borderRadius:'4px',background:'rgba(255,255,255,0.08)',overflow:'hidden'}}>
+                              <div style={{height:'100%',width:`${Math.min(100,a.pct)}%`,background: a.is_due ? '#e04040' : '#4fc38a',borderRadius:'4px'}} />
+                            </div>
+                            <button className="button ghost" type="button" style={{fontSize:'0.72rem',padding:'2px 7px'}}
+                              onClick={() => apiFetch(`/api/maintenance-alerts/${a.id}/reset`,{method:'POST'}).then(r => {
+                                setMaintAlerts(prev => ({...prev, [selectedDrone.id]: (prev[selectedDrone.id]??[]).map(x => x.id===a.id ? {...x, current_count:0, is_due:false, pct:0} : x)}));
+                              }).catch(() => {})}>Reset</button>
+                            <button className="button danger" type="button" style={{fontSize:'0.72rem',padding:'2px 7px'}}
+                              onClick={() => { if(!confirm('Delete reminder?')) return; apiFetch(`/api/maintenance-alerts/${a.id}`,{method:'DELETE'}).then(() => setMaintAlerts(prev => ({...prev, [selectedDrone.id]: (prev[selectedDrone.id]??[]).filter(x => x.id!==a.id)}))).catch(() => {}); }}>✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
                 <h3>Maintenance history — {selectedDrone.name}</h3>
                 {selectedDrone.maintenance_events.length === 0 && (
                   <p style={{color:'var(--text-muted)',fontSize:'0.88rem'}}>No maintenance events yet.</p>
@@ -2837,6 +3044,185 @@ export default function HomePage() {
               </section>
             );
           })()}
+
+          {/* ── #10 PHOTOS TAB ── */}
+          {droneTab === 'photos' && (
+            <section className="content-grid">
+              <article className="panel span-12">
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
+                  <h3 style={{margin:0}}>Photo Gallery — {selectedDrone.name}</h3>
+                  <a className="button ghost" style={{fontSize:'0.8rem',textDecoration:'none'}} href={`${apiBase}/api/drones/${selectedDrone.id}/export`} target="_blank">Export JSON ↗</a>
+                </div>
+                {(() => {
+                  const photoFiles = selectedDrone.snapshots.flatMap(s => s.files.filter((f: {role: string}) => f.role === 'photo'));
+                  if (photoFiles.length === 0) return (
+                    <div style={{textAlign:'center',padding:'40px',color:'var(--text-muted)'}}>
+                      <div style={{fontSize:'2rem',marginBottom:'8px'}}>📸</div>
+                      <p>No photos yet. Upload images via Snapshots tab (export type: photo).</p>
+                    </div>
+                  );
+                  return (
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'10px'}}>
+                      {photoFiles.map((f: {id: number; original_filename: string | null; role: string}) => (
+                        <div key={f.id} style={{borderRadius:'8px',overflow:'hidden',border:'1px solid var(--border)',background:'var(--surface2)'}}>
+                          <img src={`${apiBase}/api/files/${f.id}/download`} alt={f.original_filename || 'photo'}
+                            style={{width:'100%',height:'160px',objectFit:'cover'}}
+                            onError={(e) => { (e.target as HTMLImageElement).style.display='none'; }} />
+                          <div style={{padding:'6px 8px',fontSize:'0.75rem',color:'var(--text-muted)',display:'flex',justifyContent:'space-between'}}>
+                            <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.original_filename || 'photo'}</span>
+                            <a href={`${apiBase}/api/files/${f.id}/download`} target="_blank" style={{color:'var(--accent)',flexShrink:0,marginLeft:'6px'}}>↓</a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </article>
+            </section>
+          )}
+
+          {/* ── #15 ELRS TAB ── */}
+          {droneTab === 'elrs' && (
+            <section className="content-grid">
+              <article className="panel span-4">
+                <h3>Add ELRS Profile</h3>
+                <form className="stack" onSubmit={e => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget);
+                  const body: Record<string,unknown> = {
+                    name: fd.get('name'), device_type: fd.get('device_type'),
+                    drone_id: selectedDrone.id,
+                    firmware_version: fd.get('firmware_version') || null,
+                    binding_phrase: fd.get('binding_phrase') || null,
+                    rf_freq: fd.get('rf_freq') || null,
+                    rf_mode: fd.get('rf_mode') || null,
+                    tx_power: fd.get('tx_power') || null,
+                    notes: fd.get('notes') || null,
+                    raw_config: fd.get('raw_config') || null,
+                  };
+                  apiFetch<ElrsProfile>('/api/elrs-profiles', {method:'POST',body:JSON.stringify(body)})
+                    .then(p => { setElrsProfiles(prev => [p,...prev]); (e.target as HTMLFormElement).reset(); setOk('ELRS profile saved.'); })
+                    .catch(err => setErr((err as Error).message));
+                }}>
+                  <label className="field"><span>Profile name</span><input name="name" placeholder="RX 2026-05-10" required /></label>
+                  <div className="two-col">
+                    <label className="field"><span>Device type</span>
+                      <select name="device_type">
+                        <option value="rx">RX (receiver)</option>
+                        <option value="tx">TX (transmitter)</option>
+                      </select>
+                    </label>
+                    <label className="field"><span>RF Band</span>
+                      <select name="rf_freq">
+                        <option value="2.4GHz">2.4 GHz</option>
+                        <option value="900MHz">900 MHz</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="two-col">
+                    <label className="field"><span>Firmware version</span><input name="firmware_version" placeholder="3.5.1" /></label>
+                    <label className="field"><span>TX power</span><input name="tx_power" placeholder="250mW" /></label>
+                  </div>
+                  <label className="field"><span>RF mode</span><input name="rf_mode" placeholder="D250 / FLRC / 50Hz" /></label>
+                  <label className="field"><span>Binding phrase</span><input name="binding_phrase" placeholder="my_secret_phrase" /></label>
+                  <label className="field"><span>Raw config (JSON / text)</span><textarea name="raw_config" rows={3} placeholder='{"uid":[1,2,3,4,5,6],"region":0}' /></label>
+                  <label className="field"><span>Notes</span><textarea name="notes" placeholder="RX mounted on drone, failsafe: land" /></label>
+                  <button className="button secondary" type="submit">Save ELRS Profile</button>
+                </form>
+              </article>
+              <article className="panel span-8">
+                <h3>ELRS Profiles — {selectedDrone.name}</h3>
+                {elrsProfiles.filter(p => p.drone_id === selectedDrone.id).length === 0 && (
+                  <p style={{color:'var(--text-muted)'}}>No ELRS profiles saved yet.</p>
+                )}
+                <div className="stack">
+                  {elrsProfiles.filter(p => p.drone_id === selectedDrone.id).map(p => (
+                    <div key={p.id} className="card">
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'6px'}}>
+                        <div>
+                          <strong>{p.name}</strong>
+                          <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginTop:'4px'}}>
+                            <span className="badge" style={{fontSize:'0.73rem'}}>{p.device_type.toUpperCase()}</span>
+                            {p.rf_freq && <span className="badge" style={{fontSize:'0.73rem'}}>{p.rf_freq}</span>}
+                            {p.firmware_version && <span className="badge" style={{fontSize:'0.73rem'}}>v{p.firmware_version}</span>}
+                            {p.tx_power && <span className="badge" style={{fontSize:'0.73rem'}}>{p.tx_power}</span>}
+                            {p.is_current && <span className="badge" style={{background:'rgba(79,195,138,0.15)',color:'#4fc38a',fontSize:'0.73rem'}}>current</span>}
+                          </div>
+                        </div>
+                        <button className="button danger" type="button" style={{padding:'3px 8px',fontSize:'0.75rem'}}
+                          onClick={() => { if (!confirm(`Delete "${p.name}"?`)) return; apiFetch(`/api/elrs-profiles/${p.id}`,{method:'DELETE'}).then(() => setElrsProfiles(prev => prev.filter(x => x.id !== p.id))).catch(() => {}); }}>✕</button>
+                      </div>
+                      {p.rf_mode && <div style={{fontSize:'0.8rem',color:'var(--text-muted)'}}>Mode: {p.rf_mode}</div>}
+                      {p.binding_phrase && <div style={{fontSize:'0.8rem',color:'var(--text-muted)'}}>Phrase: <code style={{background:'var(--surface2)',padding:'1px 4px',borderRadius:'3px'}}>{p.binding_phrase}</code></div>}
+                      {p.notes && <p style={{fontSize:'0.82rem',marginTop:'4px'}}>{p.notes}</p>}
+                      {p.raw_config && (
+                        <details style={{marginTop:'4px'}}>
+                          <summary style={{cursor:'pointer',fontSize:'0.78rem',color:'var(--text-muted)'}}>Raw config</summary>
+                          <pre style={{fontSize:'0.72rem',background:'var(--surface2)',padding:'6px',borderRadius:'4px',overflow:'auto',marginTop:'4px'}}>{p.raw_config}</pre>
+                        </details>
+                      )}
+                      <small style={{color:'var(--text-muted)'}}>{p.created_at.slice(0,10)}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </section>
+          )}
+
+          {/* ── #7 STATS TAB ── */}
+          {droneTab === 'stats' && (
+            <section className="content-grid">
+              <article className="panel span-12">
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
+                  <h3 style={{margin:0}}>Flight Statistics — {selectedDrone.name}</h3>
+                  <a className="button ghost" style={{textDecoration:'none',fontSize:'0.82rem'}}
+                    href={`${apiBase}/api/drones/${selectedDrone.id}/report`} target="_blank">
+                    🖨 Print Report (PDF)
+                  </a>
+                </div>
+                {(() => {
+                  const s = droneStats[selectedDrone.id];
+                  if (!s) return <p style={{color:'var(--text-muted)'}}>Loading stats…</p>;
+                  const hrs = Math.floor(s.total_minutes / 60);
+                  const mins = s.total_minutes % 60;
+                  return (
+                    <div>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:'10px',marginBottom:'16px'}}>
+                        {[
+                          ['Total flights', s.total_flights],
+                          ['Total flight time', `${hrs}h ${mins}min`],
+                          ['Avg per flight', `${s.avg_minutes} min`],
+                          ['Last 30 days', `${s.flights_last_30d} flights`],
+                          ['Last flight', s.last_flight_date ?? '—'],
+                          ['Snapshots', selectedDrone.snapshots.length],
+                        ].map(([label, value]) => (
+                          <div key={String(label)} style={{padding:'10px 14px',borderRadius:'8px',border:'1px solid var(--border)',background:'var(--surface2)',textAlign:'center'}}>
+                            <div style={{fontSize:'1.3rem',fontWeight:700}}>{value}</div>
+                            <div style={{fontSize:'0.72rem',color:'var(--text-muted)',marginTop:'2px'}}>{label}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {selectedDrone.flight_notes.length > 0 && (
+                        <div>
+                          <h4 style={{fontSize:'0.85rem',color:'var(--text-muted)',marginBottom:'6px'}}>RECENT ACTIVITY</h4>
+                          <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+                            {[...selectedDrone.flight_notes].sort((a,b) => b.created_at.localeCompare(a.created_at)).slice(0,10).map(f => (
+                              <div key={f.id} style={{display:'flex',gap:'10px',alignItems:'center',padding:'5px 8px',borderRadius:'5px',background:'var(--surface2)',fontSize:'0.82rem'}}>
+                                <span style={{color:'var(--text-muted)',minWidth:'70px'}}>{f.flight_date ?? f.created_at.slice(0,10)}</span>
+                                <span style={{flex:1}}>{f.title}</span>
+                                {f.duration_minutes && <span className="badge" style={{fontSize:'0.71rem'}}>⏱ {f.duration_minutes}m</span>}
+                                {f.outcome && f.outcome !== 'ok' && <span className="badge" style={{fontSize:'0.71rem',color:'#e04040'}}>{f.outcome}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </article>
+            </section>
+          )}
 
           {/* ── COMPARE TAB ── */}
           {droneTab === 'compare' && (

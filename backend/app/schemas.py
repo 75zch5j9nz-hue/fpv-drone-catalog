@@ -558,3 +558,104 @@ class SpareStockOut(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ── #7 Flight stats ───────────────────────────────────────────────────────────
+
+class DroneFlightStats(BaseModel):
+    drone_id: int
+    total_flights: int
+    total_minutes: int
+    avg_minutes: float
+    last_flight_date: str | None
+    flights_last_30d: int
+
+
+# ── #8 Maintenance alerts ─────────────────────────────────────────────────────
+
+class MaintenanceAlertCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=160)
+    trigger_type: str  # flight_count | days | cycle_count
+    trigger_value: int = Field(ge=1)
+
+
+class MaintenanceAlertOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    drone_id: int
+    title: str
+    trigger_type: str
+    trigger_value: int
+    current_count: int
+    is_active: bool
+    last_reset_at: datetime | None
+    created_at: datetime
+    # Computed
+    is_due: bool = False
+    pct: int = 0
+
+
+# ── #11 User auth ─────────────────────────────────────────────────────────────
+
+class UserCreate(BaseModel):
+    username: str = Field(min_length=2, max_length=80)
+    password: str = Field(min_length=6)
+    display_name: str | None = None
+    role: str = "pilot"
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    username: str
+    display_name: str | None
+    role: str
+    is_active: bool
+    created_at: datetime
+    last_login_at: datetime | None
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
+
+
+# ── #15 ELRS profile backup ───────────────────────────────────────────────────
+
+class ElrsProfileCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    drone_id: int | None = None
+    device_type: str = "rx"
+    firmware_version: str | None = None
+    binding_phrase: str | None = None
+    rf_freq: str | None = None
+    rf_mode: str | None = None
+    tx_power: str | None = None
+    notes: str | None = None
+    raw_config: str | None = None
+
+
+class ElrsProfileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    drone_id: int | None
+    name: str
+    device_type: str
+    firmware_version: str | None
+    binding_phrase: str | None
+    rf_freq: str | None
+    rf_mode: str | None
+    tx_power: str | None
+    notes: str | None
+    raw_config: str | None
+    is_current: bool
+    created_at: datetime
+
+
+# ── #12 OSD / telemetry import ────────────────────────────────────────────────
+
+class OsdImportResult(BaseModel):
+    imported: int
+    skipped: int
+    flight_notes: list[dict]

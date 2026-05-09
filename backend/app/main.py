@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
 from .db import Base, engine, get_db
-from .models import Battery, BuildVersion, Drone, FileRole, FlightNote, InstalledComponent, MaintenanceEvent, Manufacturer, PreflightChecklistItem, Product, ProductCategory, ProductVariant, Snapshot, SpareStock, StoredFile
+from .models import Battery, BuildVersion, Drone, ElrsProfile, FileRole, FlightNote, InstalledComponent, MaintenanceAlert, MaintenanceEvent, Manufacturer, PreflightChecklistItem, Product, ProductCategory, ProductVariant, Snapshot, SpareStock, StoredFile, User
 from .parser import parse_betaflight_config
 
 _BF_VERSION_RE = re.compile(r"Betaflight\s*/\s*(?:INAV\s*/\s*)?[^/]+\s+([0-9]+\.[0-9]+\.[0-9]+)", re.IGNORECASE)
@@ -55,10 +55,19 @@ from .schemas import (
     SnapshotCreate,
     SnapshotOut,
     SnapshotUpdate,
+    DroneFlightStats,
+    ElrsProfileCreate,
+    ElrsProfileOut,
+    MaintenanceAlertCreate,
+    MaintenanceAlertOut,
+    OsdImportResult,
     SpareStockCreate,
     SpareStockOut,
     SpareStockUpdate,
     StoredFileOut,
+    TokenResponse,
+    UserCreate,
+    UserOut,
 )
 from .storage import (
     build_relative_path,
@@ -1332,3 +1341,580 @@ def list_build_versions(drone_id: int, db: Session = Depends(get_db)) -> list[Bu
             .order_by(BuildVersion.created_at.desc())
         ).scalars()
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# #7  FLIGHT STATS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/drones/{drone_id}/stats", response_model=DroneFlightStats)
+def get_drone_stats(drone_id: int, db: Session = Depends(get_db)) -> DroneFlightStats:
+    drone = get_drone_or_404(db, drone_id)
+    notes = list(db.execute(
+        select(FlightNote).where(FlightNote.drone_id == drone_id)
+    ).scalars())
+    total_flights = len(notes)
+    total_minutes = sum(n.duration_minutes or 0 for n in notes)
+    avg_minutes = round(total_minutes / total_flights, 1) if total_flights else 0.0
+    last_flight = max((n.flight_date or str(n.created_at)[:10] for n in notes), default=None)
+    from datetime import timezone
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - __import__("datetime").timedelta(days=30)
+    flights_30d = sum(1 for n in notes if n.created_at >= cutoff)
+    return DroneFlightStats(
+        drone_id=drone.id,
+        total_flights=total_flights,
+        total_minutes=total_minutes,
+        avg_minutes=avg_minutes,
+        last_flight_date=last_flight,
+        flights_last_30d=flights_30d,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# #8  MAINTENANCE ALERTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/drones/{drone_id}/maintenance-alerts", response_model=list[MaintenanceAlertOut])
+def list_maintenance_alerts(drone_id: int, db: Session = Depends(get_db)) -> list[MaintenanceAlertOut]:
+    get_drone_or_404(db, drone_id)
+    alerts = list(db.execute(
+        select(MaintenanceAlert).where(MaintenanceAlert.drone_id == drone_id)
+    ).scalars())
+    result = []
+    for a in alerts:
+        pct = min(100, int(a.current_count * 100 / a.trigger_value)) if a.trigger_value else 0
+        out = MaintenanceAlertOut.model_validate(a)
+        out.is_due = a.current_count >= a.trigger_value
+        out.pct = pct
+        result.append(out)
+    return result
+
+
+@app.post("/api/drones/{drone_id}/maintenance-alerts", response_model=MaintenanceAlertOut, status_code=201)
+def create_maintenance_alert(drone_id: int, payload: MaintenanceAlertCreate, db: Session = Depends(get_db)) -> MaintenanceAlertOut:
+    get_drone_or_404(db, drone_id)
+    alert = MaintenanceAlert(drone_id=drone_id, **payload.model_dump())
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+    out = MaintenanceAlertOut.model_validate(alert)
+    out.pct = 0
+    return out
+
+
+@app.post("/api/maintenance-alerts/{alert_id}/reset", response_model=MaintenanceAlertOut)
+def reset_maintenance_alert(alert_id: int, db: Session = Depends(get_db)) -> MaintenanceAlertOut:
+    alert = db.execute(select(MaintenanceAlert).where(MaintenanceAlert.id == alert_id)).scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert.current_count = 0
+    alert.last_reset_at = datetime.utcnow()
+    db.commit()
+    db.refresh(alert)
+    out = MaintenanceAlertOut.model_validate(alert)
+    out.pct = 0
+    return out
+
+
+@app.patch("/api/maintenance-alerts/{alert_id}/increment")
+def increment_maintenance_alert(alert_id: int, amount: int = 1, db: Session = Depends(get_db)) -> dict:
+    alert = db.execute(select(MaintenanceAlert).where(MaintenanceAlert.id == alert_id)).scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert.current_count = alert.current_count + amount
+    db.commit()
+    return {"current_count": alert.current_count, "is_due": alert.current_count >= alert.trigger_value}
+
+
+@app.delete("/api/maintenance-alerts/{alert_id}", status_code=204)
+def delete_maintenance_alert(alert_id: int, db: Session = Depends(get_db)) -> None:
+    alert = db.execute(select(MaintenanceAlert).where(MaintenanceAlert.id == alert_id)).scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    db.delete(alert)
+    db.commit()
+
+
+@app.get("/api/maintenance-alerts/due", response_model=list[MaintenanceAlertOut])
+def list_due_alerts(db: Session = Depends(get_db)) -> list[MaintenanceAlertOut]:
+    """All alerts across all drones that are due."""
+    alerts = list(db.execute(
+        select(MaintenanceAlert).where(
+            MaintenanceAlert.is_active == True,
+            MaintenanceAlert.current_count >= MaintenanceAlert.trigger_value
+        )
+    ).scalars())
+    result = []
+    for a in alerts:
+        out = MaintenanceAlertOut.model_validate(a)
+        out.is_due = True
+        out.pct = 100
+        result.append(out)
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# #9  PDF EXPORT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/drones/{drone_id}/report")
+def drone_report_html(drone_id: int, db: Session = Depends(get_db)):
+    """Returns a print-ready HTML report for the drone."""
+    from fastapi.responses import HTMLResponse
+    drone = get_drone_or_404(db, drone_id)
+    snapshots = sorted(drone.snapshots, key=lambda s: s.created_at, reverse=True)
+    flights = sorted(drone.flight_notes, key=lambda f: f.created_at, reverse=True)
+    maintenance = sorted(drone.maintenance_events, key=lambda m: m.created_at, reverse=True)
+
+    total_mins = sum(f.duration_minutes or 0 for f in flights)
+    hours = total_mins // 60
+    mins = total_mins % 60
+
+    def row(label, value):
+        if not value:
+            return ""
+        return f"<tr><td style='color:#888;padding:3px 8px;white-space:nowrap'>{label}</td><td style='padding:3px 8px'>{value}</td></tr>"
+
+    snap_rows = "".join(
+        f"<tr><td>{s.name}</td><td>{s.betaflight_version or '—'}</td><td>{'✓ current' if s.is_current else ''}</td><td>{'✓ known-good' if s.is_known_good else ''}</td><td>{str(s.created_at)[:10]}</td></tr>"
+        for s in snapshots
+    )
+    flight_rows = "".join(
+        f"<tr><td>{f.flight_date or str(f.created_at)[:10]}</td><td>{f.title}</td><td>{f.duration_minutes or '—'} min</td><td>{f.outcome}</td><td>{f.location or '—'}</td></tr>"
+        for f in flights[:20]
+    )
+    maint_rows = "".join(
+        f"<tr><td>{str(m.created_at)[:10]}</td><td>{m.title}</td><td>{m.event_type}</td><td>{m.repair_cost_pln or '—'} PLN</td></tr>"
+        for m in maintenance
+    )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"/>
+<title>Drone Report — {drone.name}</title>
+<style>
+  body{{font-family:system-ui,sans-serif;color:#1a1a1a;margin:32px;font-size:13px}}
+  h1{{font-size:22px;margin:0 0 4px}} h2{{font-size:15px;margin:20px 0 6px;border-bottom:1px solid #ddd;padding-bottom:3px}}
+  table{{border-collapse:collapse;width:100%;margin-bottom:12px}}
+  th{{background:#f4f4f4;text-align:left;padding:4px 8px;font-size:12px}}
+  td{{border-top:1px solid #eee;padding:4px 8px;vertical-align:top}}
+  .badge{{display:inline-block;padding:1px 6px;border-radius:4px;background:#e8f4e8;color:#2d7a2d;font-size:11px}}
+  @media print{{body{{margin:16px}} .no-print{{display:none}}}}
+</style>
+</head>
+<body>
+<button class="no-print" onclick="window.print()" style="margin-bottom:16px;padding:6px 16px;cursor:pointer">🖨 Print / Save as PDF</button>
+<h1>🚁 {drone.name}</h1>
+<p style="color:#666;margin:0 0 16px">{drone.category or ''} &nbsp;·&nbsp; Generated {str(datetime.utcnow())[:10]}</p>
+<h2>Basic Info</h2>
+<table>
+{row("Frame", drone.frame)}{row("Stack", drone.stack)}{row("Motors", drone.motors)}
+{row("Props", drone.props)}{row("AUW", f"{drone.auw_grams}g" if drone.auw_grams else None)}
+{row("FC Target", drone.fc_target)}{row("Radio", drone.radio_link)}{row("Video", drone.video_system)}
+{row("Status", drone.status)}{row("Operator ID", drone.operator_id)}
+{row("Reg. country", drone.registration_country)}{row("Reg. expiry", drone.registration_expiry)}
+{row("Remote ID", drone.remote_id_module)}
+</table>
+<p><strong>Total flight time:</strong> {hours}h {mins}min &nbsp;·&nbsp; <strong>Flights logged:</strong> {len(flights)}</p>
+{"<p style='color:#888;font-style:italic'>" + drone.notes + "</p>" if drone.notes else ""}
+<h2>Betaflight Snapshots ({len(snapshots)})</h2>
+{"<table><tr><th>Name</th><th>BF Version</th><th>Current</th><th>Known-good</th><th>Date</th></tr>" + snap_rows + "</table>" if snapshots else "<p style='color:#888'>No snapshots.</p>"}
+<h2>Flight Log (last 20)</h2>
+{"<table><tr><th>Date</th><th>Title</th><th>Duration</th><th>Outcome</th><th>Location</th></tr>" + flight_rows + "</table>" if flights else "<p style='color:#888'>No flights logged.</p>"}
+<h2>Maintenance History</h2>
+{"<table><tr><th>Date</th><th>Title</th><th>Type</th><th>Cost</th></tr>" + maint_rows + "</table>" if maintenance else "<p style='color:#888'>No maintenance events.</p>"}
+<p style="margin-top:32px;color:#bbb;font-size:11px">FPV Drone Catalog — {drone.name} — exported {str(datetime.utcnow())[:19]} UTC</p>
+</body></html>"""
+    return HTMLResponse(html)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# #11  USER AUTH
+# ═══════════════════════════════════════════════════════════════════════════════
+
+import hashlib as _hashlib
+import secrets as _secrets
+import time as _time
+
+_TOKEN_STORE: dict[str, dict] = {}  # in-memory token store (simple, no JWT dep)
+
+def _hash_password(pw: str) -> str:
+    return _hashlib.sha256(pw.encode()).hexdigest()
+
+def _make_token(user_id: int) -> str:
+    token = _secrets.token_urlsafe(32)
+    _TOKEN_STORE[token] = {"user_id": user_id, "exp": _time.time() + 86400 * 30}
+    return token
+
+def _get_current_user(authorization: str | None = None, db: Session = Depends(get_db)) -> User | None:
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization[7:]
+    entry = _TOKEN_STORE.get(token)
+    if not entry or entry["exp"] < _time.time():
+        return None
+    return db.execute(select(User).where(User.id == entry["user_id"])).scalar_one_or_none()
+
+from fastapi import Header as _Header
+
+@app.get("/api/users", response_model=list[UserOut])
+def list_users(db: Session = Depends(get_db)) -> list[User]:
+    return list(db.execute(select(User).order_by(User.created_at)).scalars())
+
+
+@app.post("/api/users", response_model=UserOut, status_code=201)
+def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
+    existing = db.execute(select(User).where(User.username == payload.username)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="Username already exists")
+    user = User(
+        username=payload.username,
+        display_name=payload.display_name,
+        hashed_password=_hash_password(payload.password),
+        role=payload.role,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.post("/api/auth/login", response_model=TokenResponse)
+def login(payload: dict, db: Session = Depends(get_db)) -> TokenResponse:
+    user = db.execute(select(User).where(User.username == payload.get("username"))).scalar_one_or_none()
+    if not user or user.hashed_password != _hash_password(payload.get("password", "")):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account disabled")
+    user.last_login_at = datetime.utcnow()
+    db.commit()
+    token = _make_token(user.id)
+    return TokenResponse(access_token=token, user=UserOut.model_validate(user))
+
+
+@app.get("/api/auth/me", response_model=UserOut)
+def get_me(authorization: str | None = _Header(default=None), db: Session = Depends(get_db)) -> User:
+    user = _get_current_user(authorization, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
+
+
+@app.patch("/api/users/{user_id}", response_model=UserOut)
+def update_user(user_id: int, payload: dict, db: Session = Depends(get_db)) -> User:
+    user = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if "display_name" in payload:
+        user.display_name = payload["display_name"]
+    if "role" in payload:
+        user.role = payload["role"]
+    if "is_active" in payload:
+        user.is_active = payload["is_active"]
+    if "password" in payload and payload["password"]:
+        user.hashed_password = _hash_password(payload["password"])
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.delete("/api/users/{user_id}", status_code=204)
+def delete_user(user_id: int, db: Session = Depends(get_db)) -> None:
+    user = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(user)
+    db.commit()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# #12  OSD / TELEMETRY IMPORT (DJI .srt)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/drones/{drone_id}/import-osd", response_model=OsdImportResult, status_code=201)
+async def import_osd(
+    drone_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> OsdImportResult:
+    drone = get_drone_or_404(db, drone_id)
+    content = (await file.read()).decode("utf-8", errors="replace")
+    imported = 0
+    skipped = 0
+    flight_notes_created = []
+
+    fname = (file.filename or "").lower()
+
+    if fname.endswith(".srt"):
+        # DJI .srt subtitle format: timestamp + GPS/altitude/speed data
+        import re as _re
+        blocks = _re.split(r"\n\n+", content.strip())
+        frames: list[dict] = []
+        for block in blocks:
+            lines = block.strip().splitlines()
+            if len(lines) < 3:
+                continue
+            ts_match = _re.search(r"(\d{2}:\d{2}:\d{2}),(\d{3})", lines[1] if len(lines) > 1 else "")
+            data_line = " ".join(lines[2:]) if len(lines) > 2 else ""
+            gps_match = _re.search(r"GPS\s*\(([-\d.]+),\s*([-\d.]+)\)", data_line)
+            alt_match = _re.search(r"(?:altitude|alt)[:\s]*([\d.]+)", data_line, _re.IGNORECASE)
+            spd_match = _re.search(r"(?:speed|spd)[:\s]*([\d.]+)", data_line, _re.IGNORECASE)
+            if ts_match:
+                frames.append({
+                    "ts": ts_match.group(0),
+                    "lat": float(gps_match.group(1)) if gps_match else None,
+                    "lon": float(gps_match.group(2)) if gps_match else None,
+                    "alt": float(alt_match.group(1)) if alt_match else None,
+                    "spd": float(spd_match.group(1)) if spd_match else None,
+                })
+        if frames:
+            duration_secs = len(frames) / 30  # assume ~30fps
+            duration_min = max(1, int(duration_secs / 60))
+            today = str(datetime.utcnow())[:10]
+            note = FlightNote(
+                drone_id=drone.id,
+                title=f"DJI flight — {file.filename}",
+                note=f"Imported from OSD .srt file. {len(frames)} frames, ~{duration_min} min.",
+                flight_date=today,
+                duration_minutes=duration_min,
+                outcome="ok",
+            )
+            db.add(note)
+            db.commit()
+            db.refresh(note)
+            imported += 1
+            flight_notes_created.append({"id": note.id, "title": note.title})
+        else:
+            skipped += 1
+
+    elif fname.endswith(".csv"):
+        import csv as _csv, io as _io
+        reader = _csv.DictReader(_io.StringIO(content))
+        rows = list(reader)
+        if rows:
+            duration_min = max(1, len(rows) // 600)  # assume ~10Hz
+            note = FlightNote(
+                drone_id=drone.id,
+                title=f"CSV telemetry — {file.filename}",
+                note=f"Imported CSV log. {len(rows)} data points.",
+                flight_date=str(datetime.utcnow())[:10],
+                duration_minutes=duration_min,
+                outcome="ok",
+            )
+            db.add(note)
+            db.commit()
+            db.refresh(note)
+            imported += 1
+            flight_notes_created.append({"id": note.id, "title": note.title})
+        else:
+            skipped += 1
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported format. Use .srt (DJI OSD) or .csv")
+
+    return OsdImportResult(imported=imported, skipped=skipped, flight_notes=flight_notes_created)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# #15  ELRS PROFILE BACKUP
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/elrs-profiles", response_model=list[ElrsProfileOut])
+def list_elrs_profiles(drone_id: int | None = None, db: Session = Depends(get_db)) -> list[ElrsProfile]:
+    q = select(ElrsProfile).order_by(ElrsProfile.created_at.desc())
+    if drone_id is not None:
+        q = q.where(ElrsProfile.drone_id == drone_id)
+    return list(db.execute(q).scalars())
+
+
+@app.post("/api/elrs-profiles", response_model=ElrsProfileOut, status_code=201)
+def create_elrs_profile(payload: ElrsProfileCreate, db: Session = Depends(get_db)) -> ElrsProfile:
+    profile = ElrsProfile(**payload.model_dump())
+    # Mark as current and unmark others for this drone/type
+    if payload.drone_id:
+        db.execute(
+            select(ElrsProfile)
+            .where(ElrsProfile.drone_id == payload.drone_id, ElrsProfile.device_type == payload.device_type)
+        )
+    profile.is_current = True
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+@app.patch("/api/elrs-profiles/{profile_id}", response_model=ElrsProfileOut)
+def update_elrs_profile(profile_id: int, payload: dict, db: Session = Depends(get_db)) -> ElrsProfile:
+    profile = db.execute(select(ElrsProfile).where(ElrsProfile.id == profile_id)).scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    for k, v in payload.items():
+        if hasattr(profile, k):
+            setattr(profile, k, v)
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+@app.delete("/api/elrs-profiles/{profile_id}", status_code=204)
+def delete_elrs_profile(profile_id: int, db: Session = Depends(get_db)) -> None:
+    profile = db.execute(select(ElrsProfile).where(ElrsProfile.id == profile_id)).scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    db.delete(profile)
+    db.commit()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# #16  BETAFLIGHT PRESETS COLD BACKUP SCRAPER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_BF_PRESETS_INDEX = "https://raw.githubusercontent.com/betaflight/firmware-presets/master/index.json"
+_BF_PRESETS_RAW_BASE = "https://raw.githubusercontent.com/betaflight/firmware-presets/master/"
+
+# Curated manufacturer CLI dump URLs for known popular drones
+# Research confirmed: GEPRC hosts official .txt dumps at geprc.com/wp-content/uploads/
+_MANUFACTURER_PRESETS: list[dict] = [
+    # GEPRC Vapor-D6 O4 Pro (GEP-F722-HD v2)
+    {"title":"GEPRC Vapor-D6 O4 — ELRS (BF 4.5.1)", "drone_hint":"vapor", "url":"https://geprc.com/wp-content/uploads/2025/06/Vapor-D6-O4-ELRS-4.5.1.txt", "source":"geprc.com"},
+    {"title":"GEPRC Vapor-D6 O4 — ELRS + GPS (BF 4.5.1)", "drone_hint":"vapor", "url":"https://geprc.com/wp-content/uploads/2025/06/Vapor-D6-O4-ELRS-GPS-4.5.1.txt", "source":"geprc.com"},
+    {"title":"GEPRC Vapor-D6 O4 — SBUS (BF 4.5.1)", "drone_hint":"vapor", "url":"https://geprc.com/wp-content/uploads/2025/06/Vapor-D6-O4-SBUS-4.5.1.txt", "source":"geprc.com"},
+    {"title":"GEPRC Vapor-D6 O4 — SBUS + GPS (BF 4.5.1)", "drone_hint":"vapor", "url":"https://geprc.com/wp-content/uploads/2025/06/Vapor-D6-O4-SBUS-GPS-4.5.1.txt", "source":"geprc.com"},
+    # GEPRC CineLog35 V3 O4 Pro (GEP-F722-45A AIO V2)
+    {"title":"GEPRC CineLog35 V3 HD — SBUS (BF 4.5.2)", "drone_hint":"cinelog35", "url":"https://geprc.com/wp-content/uploads/2025/11/Cinelog35_V3-HD-SBUS-4.5.2.txt", "source":"geprc.com"},
+    {"title":"GEPRC CineLog35 V3 HD — SBUS + GPS (BF 4.5.2)", "drone_hint":"cinelog35", "url":"https://geprc.com/wp-content/uploads/2025/11/Cinelog35_V3-HD-SBUS-GPS-4.5.2.txt", "source":"geprc.com"},
+    {"title":"GEPRC CineLog35 V3 HD — ELRS (BF 4.5.2)", "drone_hint":"cinelog35", "url":"https://geprc.com/wp-content/uploads/2025/11/Cinelog35_V3-HD-TBS-ELRS-4.5.2.txt", "source":"geprc.com"},
+    {"title":"GEPRC CineLog35 V3 HD — ELRS + GPS (BF 4.5.2)", "drone_hint":"cinelog35", "url":"https://geprc.com/wp-content/uploads/2025/11/Cinelog35_V3-HD-TBS-ELRS-GPS-4.5.2.txt", "source":"geprc.com"},
+    # GEPRC Mark5 downloads page (O3 / DC HD)
+    {"title":"GEPRC Mark5 DC HD — ELRS (BF 4.4.3)", "drone_hint":"mark5", "url":"https://geprc.com/wp-content/uploads/2024/07/MARK5-DC-O3-ELRS-4.4.3.txt", "source":"geprc.com"},
+    # Flywoo Explorer LR4 — community diff (IntoFPV)
+    {"title":"Flywoo Explorer LR4 O4 Pro — community diff (IntoFPV)", "drone_hint":"explorer lr4", "url":"https://intofpv.com/attachment.php?aid=16742", "source":"intofpv.com"},
+]
+
+@app.get("/api/presets/search")
+async def search_bf_presets(q: str = "", drone_id: int | None = None, db: Session = Depends(get_db)) -> dict:
+    """Search BF presets from firmware-presets repo + curated manufacturer dumps."""
+
+    # Build search terms
+    search_terms: list[str] = []
+    drone_name = ""
+    if q:
+        search_terms = [t.strip().lower() for t in q.split() if t.strip()]
+    elif drone_id:
+        drone = get_drone_or_404(db, drone_id)
+        drone_name = drone.name.lower()
+        for field in (drone.name, drone.frame, drone.fc_target, drone.stack):
+            if field:
+                search_terms.extend(field.lower().split())
+        search_terms = list(set(s for s in search_terms if len(s) > 2))
+
+    # 1. Manufacturer curated presets (always checked first)
+    manufacturer_matches = []
+    for p in _MANUFACTURER_PRESETS:
+        hint = p["drone_hint"].lower()
+        if not search_terms or drone_name and hint in drone_name:
+            manufacturer_matches.append({**p, "source_type": "manufacturer", "is_factory_dump": True})
+        elif any(t in hint or hint in t for t in search_terms):
+            manufacturer_matches.append({**p, "source_type": "manufacturer", "is_factory_dump": True})
+
+    # 2. Community firmware-presets repo
+    community_matches = []
+    try:
+        req = urllib.request.Request(_BF_PRESETS_INDEX, headers={"User-Agent": "FPV-Catalog/1.0"})
+        raw = urllib.request.urlopen(req, timeout=8).read()
+        data = json.loads(raw)
+        presets = data if isinstance(data, list) else []
+
+        def score(p: dict) -> int:
+            text = " ".join([
+                str(p.get("title", "")), str(p.get("description", "")), str(p.get("author", "")),
+                " ".join(p.get("keywords", []) if isinstance(p.get("keywords"), list) else [])
+            ]).lower()
+            return sum(1 for t in search_terms if t in text)
+
+        if search_terms:
+            scored = [(score(p), p) for p in presets]
+            community_matches = [
+                {**p, "url": _BF_PRESETS_RAW_BASE + p.get("fullPath", ""),
+                 "source_type": "community", "is_factory_dump": False}
+                for s, p in sorted(scored, key=lambda x: x[0], reverse=True)
+                if s > 0
+            ][:15]
+        else:
+            community_matches = [
+                {**p, "url": _BF_PRESETS_RAW_BASE + p.get("fullPath", ""),
+                 "source_type": "community", "is_factory_dump": False}
+                for p in presets[:10]
+            ]
+    except Exception:
+        pass  # Community index unavailable — use manufacturer presets only
+
+    all_results = manufacturer_matches + community_matches
+    return {
+        "total": len(all_results),
+        "manufacturer": len(manufacturer_matches),
+        "community": len(community_matches),
+        "results": all_results,
+        "search_terms": search_terms,
+    }
+
+
+@app.post("/api/drones/{drone_id}/presets/import", response_model=SnapshotOut, status_code=201)
+async def import_bf_preset(drone_id: int, payload: dict, db: Session = Depends(get_db)) -> Snapshot:
+    """Download a BF preset file and store it as a cold-backup snapshot."""
+    drone = get_drone_or_404(db, drone_id)
+    preset_url: str = payload.get("url", "")
+    preset_title: str = payload.get("title", "BF Preset")
+
+    if not preset_url.startswith("https://"):
+        raise HTTPException(status_code=400, detail="Invalid preset URL")
+
+    try:
+        req = urllib.request.Request(preset_url, headers={"User-Agent": "FPV-Catalog/1.0"})
+        content = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", errors="replace")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Cannot fetch preset: {e}")
+
+    # Auto-detect BF version from content
+    bf_ver = None
+    m = _BF_VERSION_RE.search(content)
+    if m:
+        bf_ver = m.group(1)
+
+    # Create snapshot marked as cold backup
+    today = str(datetime.utcnow())[:10]
+    snap_name = f"[Preset] {preset_title} — {today}"
+    base_slug = safe_slug(snap_name, f"preset-{drone.id}")
+    snap = Snapshot(
+        drone_id=drone.id,
+        name=snap_name,
+        slug=next_unique_slug(db, Snapshot, base_slug, scope_column=Snapshot.drone_id, scope_value=drone.id),
+        betaflight_version=bf_ver,
+        notes=f"Cold backup — imported from betaflight-presets.\nSource: {preset_url}",
+        is_current=False,
+        is_known_good=False,
+    )
+    db.add(snap)
+    db.flush()
+
+    # Store the preset content as a stored file
+    relative_path, stored_filename = build_relative_path(
+        drone.slug, snap.slug, FileRole.diff_all, "preset.txt"
+    )
+    write_bytes(settings.upload_path / relative_path, content.encode("utf-8"))
+    parsed = parse_betaflight_config(content) or None
+    sf = StoredFile(
+        drone_id=drone.id,
+        snapshot_id=snap.id,
+        role=FileRole.diff_all,
+        original_filename="preset.txt",
+        stored_filename=stored_filename,
+        relative_path=str(relative_path),
+        mime_type="text/plain",
+        sha256=sha256_hex(content.encode()),
+        size_bytes=len(content.encode()),
+        parse_status="parsed" if parsed else "unsupported",
+        text_excerpt=excerpt_text(content),
+    )
+    db.add(sf)
+    db.commit()
+    return get_snapshot_or_404(db, snap.id)

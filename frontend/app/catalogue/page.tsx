@@ -269,10 +269,26 @@ export default function CataloguePage() {
                     <p className="cat-no-specs">No detailed specifications on file yet.</p>
                   )}
 
+                  {/* #13 Marketplace buy buttons */}
                   {selected.product_url && (
-                    <a href={selected.product_url} target="_blank" rel="noreferrer" className="button" style={{ display: 'inline-flex', marginTop: '12px' }}>
-                      View on manufacturer site ↗
-                    </a>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                      <a href={selected.product_url} target="_blank" rel="noreferrer" className="button" style={{ display: 'inline-flex' }}>
+                        🛒 Buy from manufacturer ↗
+                      </a>
+                      {selected.manufacturer?.name && (() => {
+                        const name = encodeURIComponent(`${selected.manufacturer.name} ${selected.name}`);
+                        return (
+                          <>
+                            <a href={`https://www.getfpv.com/search?q=${name}`} target="_blank" rel="noreferrer"
+                              className="button ghost" style={{ display: 'inline-flex', fontSize: '0.8rem' }}>GetFPV ↗</a>
+                            <a href={`https://www.racedayquads.com/search?type=product&q=${name}`} target="_blank" rel="noreferrer"
+                              className="button ghost" style={{ display: 'inline-flex', fontSize: '0.8rem' }}>RDQ ↗</a>
+                            <a href={`https://www.amazon.com/s?k=${name}`} target="_blank" rel="noreferrer"
+                              className="button ghost" style={{ display: 'inline-flex', fontSize: '0.8rem' }}>Amazon ↗</a>
+                          </>
+                        );
+                      })()}
+                    </div>
                   )}
 
                   {selected.variants.length > 0 && (

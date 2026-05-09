@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, Enum as SqlEnum, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Enum as SqlEnum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -328,10 +328,67 @@ class SpareStock(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     part_name: Mapped[str] = mapped_column(String(200))
-    category: Mapped[str | None] = mapped_column(String(60), nullable=True)   # props, motors, fc, esc, frame, other
+    category: Mapped[str | None] = mapped_column(String(60), nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, default=0)
     low_stock_threshold: Mapped[int] = mapped_column(Integer, default=2)
     drone_id: Mapped[int | None] = mapped_column(ForeignKey("drones.id", ondelete="SET NULL"), nullable=True, index=True)
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ── #8 Maintenance schedule alerts ────────────────────────────────────────────
+
+class MaintenanceAlert(Base):
+    """Recurring maintenance reminder triggered by flight count, days, or battery cycles."""
+    __tablename__ = "maintenance_alerts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    drone_id: Mapped[int] = mapped_column(ForeignKey("drones.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(160))
+    trigger_type: Mapped[str] = mapped_column(String(20))  # flight_count | days | cycle_count
+    trigger_value: Mapped[int] = mapped_column(Integer)
+    current_count: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_reset_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    drone: Mapped["Drone"] = relationship()
+
+
+# ── #11 Multi-user auth ───────────────────────────────────────────────────────
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    hashed_password: Mapped[str] = mapped_column(String(256))
+    role: Mapped[str] = mapped_column(String(20), default="pilot")  # admin | pilot | mechanic
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ── #15 ELRS profile backup ───────────────────────────────────────────────────
+
+class ElrsProfile(Base):
+    """ExpressLRS TX/RX configuration backup."""
+    __tablename__ = "elrs_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    drone_id: Mapped[int | None] = mapped_column(ForeignKey("drones.id", ondelete="SET NULL"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(160))
+    device_type: Mapped[str] = mapped_column(String(20), default="rx")  # rx | tx
+    firmware_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    binding_phrase: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    rf_freq: Mapped[str | None] = mapped_column(String(20), nullable=True)   # 2.4GHz | 900MHz
+    rf_mode: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    tx_power: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    raw_config: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON blob or raw text
+    is_current: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    drone: Mapped["Drone | None"] = relationship()
