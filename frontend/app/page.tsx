@@ -434,6 +434,8 @@ export default function HomePage() {
   const [status, setStatus] = useState('Loading drones...');
   const [statusIsError, setStatusIsError] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [isOffline, setIsOffline] = useState(false);
+  const [queuedOps, setQueuedOps] = useState(0);
 
   // ── Create Drone wizard ────────────────────────────────────────────────────
   const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
@@ -522,6 +524,28 @@ export default function HomePage() {
   useEffect(() => {
     apiFetch<AppStats>('/api/stats').then(setAppStats).catch(() => {});
   }, [drones, batteries]);
+
+  // ── Online/offline detection + SW sync listener ────────────────────────────
+  useEffect(() => {
+    const onOnline  = () => setIsOffline(false);
+    const onOffline = () => setIsOffline(true);
+    setIsOffline(!navigator.onLine);
+    window.addEventListener('online',  onOnline);
+    window.addEventListener('offline', onOffline);
+    // Listen for background sync completion from service worker
+    (window as unknown as Record<string, unknown>).__fpvSyncComplete = (remaining: number) => {
+      setQueuedOps(remaining);
+      if (remaining === 0) {
+        void loadDrones(selectedDroneId ?? undefined);
+        apiFetch<Battery[]>('/api/batteries').then(setBatteries).catch(() => {});
+        setOk('Synced queued operations.');
+      }
+    };
+    return () => {
+      window.removeEventListener('online',  onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   async function loadChecklist(droneId: number) {
     try {
@@ -1128,6 +1152,13 @@ export default function HomePage() {
 
   return (
     <main className="page-shell">
+      {isOffline && (
+        <div style={{background:'rgba(240,168,48,0.12)',borderBottom:'1px solid rgba(240,168,48,0.3)',padding:'6px 20px',display:'flex',alignItems:'center',gap:'10px',fontSize:'0.82rem',color:'#f0a830',position:'sticky',top:0,zIndex:100}}>
+          <span>📡 Offline — showing cached data</span>
+          {queuedOps > 0 && <span style={{marginLeft:'auto'}}>⏳ {queuedOps} operation{queuedOps !== 1 ? 's' : ''} queued</span>}
+          {queuedOps === 0 && <span style={{marginLeft:'auto',color:'var(--text-muted)'}}>Changes will sync automatically when back online</span>}
+        </div>
+      )}
       <section className="hero">
         <div className="badge-row">
           <span className="badge warm">Docker Compose MVP</span>

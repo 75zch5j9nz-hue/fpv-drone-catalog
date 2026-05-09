@@ -1,0 +1,30 @@
+{
+  "name": "FPV Drone Catalog",
+  "short_name": "FPV Fleet",
+  "description": "Self-hosted FPV drone fleet manager — Betaflight backups, checklists, flight logs",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e1117",
+  "theme_color": "#60a0f0",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Drones",
+      "short_name": "Drones",
+      "url": "/drones",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Batteries",
+      "short_name": "Batteries",
+      "url": "/batteries",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["utilities", "productivity"],
+  "lang": "en"
+}

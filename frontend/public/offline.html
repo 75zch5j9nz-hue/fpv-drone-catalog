@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FPV Drone Catalog — Offline</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0e1117; color: #e2e8f0; font-family: system-ui, sans-serif;
+      min-height: 100dvh; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 24px; text-align: center;
+    }
+    .icon { font-size: 3rem; margin-bottom: 16px; }
+    h1 { font-size: 1.4rem; margin-bottom: 8px; color: #fff; }
+    p { color: #7a8599; font-size: 0.95rem; line-height: 1.6; max-width: 320px; }
+    .btn {
+      display: inline-block; margin-top: 24px; padding: 10px 24px;
+      background: rgba(96,160,240,0.15); border: 1px solid rgba(96,160,240,0.4);
+      color: #60a0f0; border-radius: 8px; text-decoration: none; font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .note { margin-top: 32px; font-size: 0.8rem; color: #4a5568; }
+  </style>
+</head>
+<body>
+  <div class="icon">🚁</div>
+  <h1>You're offline</h1>
+  <p>FPV Drone Catalog needs a connection for the first load. Once loaded, checklists and fleet data are available offline.</p>
+  <button class="btn" onclick="location.reload()">Try again</button>
+  <p class="note">Tip: open the app on Wi-Fi first to cache your fleet data.</p>
+</body>
+</html>
