@@ -316,8 +316,4 @@ def parse_betaflight_config(text: str) -> dict[str, Any]:
         buckets[bucket].append({"key": key, "value": value})
         kv[key] = value
 
-    result = {section: entries for section, entries in buckets.items() if entries}
-    summary = extract_summary(kv)
-    if summary:
-        result["_summary"] = summary
-    return result
+    return {section: entries for section, entries in buckets.items() if entries}
